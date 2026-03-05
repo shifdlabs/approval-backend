@@ -1,0 +1,26 @@
+Prerequisites:
+1. Docker & Docker Composae Installed
+2. Golang installed globally
+
+How to run docker compose:
+1. run 'docer-compose up -d' in current project command line
+2. waiitng until all docker image created, Done!
+3. Don't forget to run 'docker-compose down' everytime you want to close the project
+
+How to open postgresql created from docker:
+1. make sure docker-compose has run
+2. run 'docker container ls'
+3. copy the CONTAINER ID from Image postgres:latest
+4. run 'docker inspect [paste container id]'
+5. find "IPAddress", copy the value. ex: 172.18.0.5
+6. Go to your browser, open 'localhost:5050' to open pgadmin
+7. After pgadmin opened, login using email: admin@admin.com & pass: root1234 [You can see this value inside app.env]
+8. In Top Left side bar, right click and choose Register > Server to create new Server
+9. Give it a name, and move to Connection section, paste the IPAddress of postgresql and fill password with 'root1234', click save
+10. Done! you've successfully open pgadmin from docker and connecting it with your postgres IPAddress
+
+How to run the project:
+1. Make sure docker compose has run
+2. run 'go run main.go'
+3. open your postman use 127.0.0.1:8081
+4. Done!
