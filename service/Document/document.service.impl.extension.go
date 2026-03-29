@@ -24,28 +24,35 @@ func (t DocumentServiceImpl) convertDocumentToDocumentResponse(document model.Do
 	if len(document.DocumentSequence) > 0 {
 		currentApprover, _ := t.DocumentSequenceRepository.GetCurrentApprover(document.ID.String())
 
-		user, _ := t.UserRepository.Get(currentApprover.UserID.String(), true)
+		if currentApprover != nil {
+			user, _ := t.UserRepository.Get(currentApprover.UserID.String(), true)
 
-		title := fmt.Sprintf("%s %s - %s",
-			user.FirstName,
-			user.LastName,
-			user.Position.Name,
-		)
+			if user != nil {
+				title := fmt.Sprintf("%s %s - %s",
+					user.FirstName,
+					user.LastName,
+					user.Position.Name,
+				)
 
-		currentApproverTitle = &title
+				currentApproverTitle = &title
+			}
+		}
 	}
 
 	lastRejectorResponse, _ := t.DocumentHistoryRepository.GetLastRejection(document.ID.String())
 	if lastRejectorResponse != nil {
 		rejectorData, _ := t.UserRepository.Get(string(lastRejectorResponse.UserID.String()), true)
-		rejectorName := fmt.Sprintf("%s %s",
-			rejectorData.FirstName,
-			rejectorData.LastName,
-		)
 
-		lastRejector = &response.RejectorResponse{
-			Name:   &rejectorName,
-			Reason: &lastRejectorResponse.Description,
+		if rejectorData != nil {
+			rejectorName := fmt.Sprintf("%s %s",
+				rejectorData.FirstName,
+				rejectorData.LastName,
+			)
+
+			lastRejector = &response.RejectorResponse{
+				Name:   &rejectorName,
+				Reason: &lastRejectorResponse.Description,
+			}
 		}
 	}
 
