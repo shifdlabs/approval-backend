@@ -175,7 +175,7 @@ func (t *DocumentNumbersRepositoryImpl) GetAllByUserID(userId string) ([]model.D
 
 	helper.PrintValue("Get All By User ID", userId)
 	var documentNumbers []model.DocumentNumbers
-	result := t.Db.Preload("NumberingFormat").Preload("NumberingFormat.Group").Where("deleted_at IS NULL").Where("state != 2").Where("user_id = ?", userId).Find(&documentNumbers)
+	result := t.Db.Preload("NumberingFormat").Preload("NumberingFormat.Group").Where("deleted_at IS NULL").Where("state != 0").Where("user_id = ?", userId).Find(&documentNumbers)
 	if result.Error != nil {
 		msg := "Failed to get all numbering formats"
 		return nil, helper.ErrorCatcher(result.Error, 500, &msg)
