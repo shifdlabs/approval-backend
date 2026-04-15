@@ -20,6 +20,7 @@ import (
 	documentNumbersRepository "Microservice/repository/DocumentNumbers"
 	documentReferenceRepository "Microservice/repository/DocumentReference"
 	documentSequenceRepository "Microservice/repository/DocumentSequence"
+	failedLoginAttemptRepository "Microservice/repository/FailedLoginAttempt"
 	numberingFormatRepository "Microservice/repository/NumberingFormat"
 	numberingGroupRepository "Microservice/repository/NumberingGroup"
 	positionRepository "Microservice/repository/Position"
@@ -116,11 +117,12 @@ func main() {
 	documentNumbersRepository := documentNumbersRepository.NewDocumentNumbersRepositoryImpl(db)
 	documentReferenceRepository := documentReferenceRepository.NewDocumentReferenceRepositoryImpl(db)
 	signatureRepository := signatureRepository.NewSignatureRepositoryImpl(db)
+	failedLoginAttemptRepository := failedLoginAttemptRepository.NewFailedLoginAttemptRepositoryImpl(db)
 
-	// Services
+	// Servic
 	tokenService := tokenService.NewTokenServiceImpl(userRepository)
-	authService := authService.NewAuthServiceImpl(userRepository, validate)
-	userService := userService.NewUserServiceImpl(userRepository, positionRepositoy, validate)
+	authService := authService.NewAuthServiceImpl(userRepository, failedLoginAttemptRepository, validate)
+	userService := userService.NewUserServiceImpl(userRepository, positionRepositoy, failedLoginAttemptRepository, validate)
 	userLogService := userLogService.NewUserLogServiceImpl(userLogRepository, validate)
 	documentSequenceService := documentSequenceService.NewDocumentSequenceServiceImpl(documentSequenceRepository, validate)
 	documentService := documentService.NewDocumentServiceImpl(documentRepository, userRepository, documentSequenceRepository, documentAttachmentRepository, documentHistoryRepository, recipientRepository, carbonCopiesRepository, userLogRepository, documentNumbersRepository, documentReferenceRepository, signatureRepository, db, validate)

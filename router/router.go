@@ -94,6 +94,7 @@ func NewRouter(
 	protectedUserRouter.PUT("/role", userController.UpdateRole)
 	protectedUserRouter.PUT("/password", userController.UpdatePassword)
 	protectedUserRouter.PUT("/access", userController.UpdateAccess)
+	protectedUserRouter.PUT("/unlock/:userId", userController.UnlockUser)
 	protectedUserRouter.PUT("/biodata", userController.UpdateBiodata)
 	protectedUserRouter.PUT("/email", userController.UpdateEmail)
 
