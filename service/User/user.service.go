@@ -20,4 +20,5 @@ type UserService interface {
 	UpdateRole(request request.UpdateRoleRequest) *helper.ErrorModel
 	UpdatePassword(request request.UpdatePasswordRequest) *helper.ErrorModel
 	UpdateAccess(request request.UpdateAccessRequest) *helper.ErrorModel
+	UnlockUser(userId string) *helper.ErrorModel
 }
