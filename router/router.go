@@ -109,9 +109,12 @@ func NewRouter(
 	protectedDocumentRouter.POST("/authorize", documentController.Authorize)
 	protectedDocumentRouter.GET("/authorization", documentController.GetAllAuthorization)
 	protectedDocumentRouter.GET("/inprogress", documentController.GetAllInProgress)
-	protectedDocumentRouter.GET("/dashboard", documentController.GetDashboardData)
 	protectedDocumentRouter.GET("/inbox", documentController.GetAllInbox)
 	protectedDocumentRouter.GET("/rejected", documentController.GetAllRejected)
+	protectedDocumentRouter.GET("/dashboard", documentController.GetDashboardSummary)
+	protectedDocumentRouter.GET("/dashboard/deadlines", documentController.GetDeadlines)
+	protectedDocumentRouter.GET("/dashboard/activities", documentController.GetRecentActivities)
+	protectedDocumentRouter.GET("/dashboard/recent", documentController.GetRecentDocuments)
 
 	protectedDocumentHistoryRouter := router.Group("/documenthistory")
 	protectedDocumentHistoryRouter.Use(middleware.DeserializeUser(Db))
