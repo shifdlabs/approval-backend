@@ -1,5 +1,3 @@
-.PHONY: up down seed fresh
-
 up:
 	docker compose up -d
 
