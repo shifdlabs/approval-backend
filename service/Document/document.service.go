@@ -28,4 +28,8 @@ type DocumentService interface {
 	GetDraftByAuthorID(authorID string) ([]response.DocumentResponse, *helper.ErrorModel)
 	GetRejectedByAuthorID(authorID string) ([]response.DocumentResponse, *helper.ErrorModel)
 	GetAllAuthorDocuments(authorID string) ([]response.DocumentResponse, *helper.ErrorModel)
+	GetDashboardSummary(userId string, period string) (*response.DashboardSummaryResponse, *helper.ErrorModel)
+	GetDeadlines(userId string) ([]response.DeadlineItemResponse, *helper.ErrorModel)
+	GetRecentActivities(userId string) ([]response.ActivityResponse, *helper.ErrorModel)
+	GetRecentDocuments(userId string, docType int) ([]response.RecentDocumentResponse, *helper.ErrorModel)
 }

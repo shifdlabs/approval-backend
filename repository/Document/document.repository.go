@@ -1,6 +1,7 @@
 package document
 
 import (
+	dashboard "Microservice/data/model/Dashboard"
 	"Microservice/helper"
 	"Microservice/model"
 
@@ -25,4 +26,8 @@ type DocumentRepository interface {
 	GetDraftByAuthorID(authorID string) ([]model.Document, *helper.ErrorModel)
 	GetRejectedByAuthorID(authorID string) ([]model.Document, *helper.ErrorModel)
 	GetAllAuthorDocuments(authorID string) ([]model.Document, *helper.ErrorModel)
+	GetDashboardSummary(userId string, period string) (*dashboard.DashboardSummaryRaw, *helper.ErrorModel)
+	GetDeadlines(userId string) ([]model.Document, *helper.ErrorModel)
+	GetRecentActivities(userId string) ([]model.DocumentHistory, *helper.ErrorModel)
+	GetRecentDocuments(userId string, docType int) ([]model.Document, *helper.ErrorModel)
 }
