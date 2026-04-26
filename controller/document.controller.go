@@ -3,7 +3,6 @@ package controller
 import (
 	request "Microservice/data/request/Document"
 	documentNumberRequest "Microservice/data/request/DocumentNumbers"
-	response "Microservice/data/response/Document"
 	"Microservice/helper"
 	"Microservice/helper/enums"
 	"Microservice/model"
@@ -153,47 +152,6 @@ func (controller *DocumentController) GetAllRejected(ctx *gin.Context) {
 		utils.SuccessResponse(ctx, documentResponse)
 
 		utils.SetCache(ctx, "All Documents", documentResponse)
-	}
-}
-
-func (controller *DocumentController) GetDashboardData(ctx *gin.Context) {
-	id, errParse := helper.GetUserId(ctx)
-	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
-		return
-	}
-
-	// Statistic Overview
-	statisticResponse, errDocumentResponse := controller.documentService.GetDocumentStatistics(*id)
-
-	// Author Documents
-	authorDocumentResponse, errDocumentResponse := controller.documentService.GetAllAuthorDocuments(*id)
-
-	// Progress Overview
-	inProgressResponse, errDocumentResponse := controller.documentService.GetInProgressOverview(*id)
-	rejectedResponse, errDocumentResponse := controller.documentService.GetRejectedOverview(*id)
-	completedResponse, errDocumentResponse := controller.documentService.GetCompletedOverview(*id)
-
-	inboxResponse, errDocumentResponse := controller.documentService.GetAllInbox(*id)
-
-	response := response.DashboardResponse{
-		Statistic:       *statisticResponse,
-		AuthorDocuments: authorDocumentResponse,
-		Progress: response.DashboardProgressResponse{
-			InProgress: inProgressResponse,
-			Rejected:   rejectedResponse,
-			Completed:  completedResponse,
-		},
-		Inbox: inboxResponse,
-	}
-
-	if errDocumentResponse != nil {
-		utils.ErrorResponse(ctx, *errDocumentResponse)
-	} else {
-		utils.SuccessResponse(ctx, response)
-
-		utils.SetCache(ctx, "All Documents", response)
 	}
 }
 
@@ -403,4 +361,86 @@ func (controller *DocumentController) GetAllInbox(ctx *gin.Context) {
 	} else {
 		utils.SuccessResponse(ctx, documentResponses)
 	}
+}
+
+func (controller *DocumentController) GetDashboardSummary(ctx *gin.Context) {
+	id, errParse := helper.GetUserId(ctx)
+	if errParse != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
+		return
+	}
+
+	period := ctx.DefaultQuery("period", "all")
+
+	validPeriods := map[string]bool{"all": true, "today": true, "week": true, "month": true}
+	if !validPeriods[period] {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid period. Use: all, today, week, month"})
+		return
+	}
+
+	summaryResponse, err := controller.documentService.GetDashboardSummary(*id, period)
+	if err != nil {
+		utils.ErrorResponse(ctx, *err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, summaryResponse)
+}
+
+func (controller *DocumentController) GetDeadlines(ctx *gin.Context) {
+	id, errParse := helper.GetUserId(ctx)
+	if errParse != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
+		return
+	}
+
+	deadlineResponse, err := controller.documentService.GetDeadlines(*id)
+	if err != nil {
+		utils.ErrorResponse(ctx, *err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, deadlineResponse)
+}
+
+func (controller *DocumentController) GetRecentActivities(ctx *gin.Context) {
+	id, errParse := helper.GetUserId(ctx)
+	if errParse != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
+		return
+	}
+
+	activitiesResponse, err := controller.documentService.GetRecentActivities(*id)
+	if err != nil {
+		utils.ErrorResponse(ctx, *err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, activitiesResponse)
+}
+
+func (controller *DocumentController) GetRecentDocuments(ctx *gin.Context) {
+	id, errParse := helper.GetUserId(ctx)
+	if errParse != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
+		return
+	}
+
+	// 0 = semua, 1 = internal, 2 = external
+	docTypeStr := ctx.DefaultQuery("type", "0")
+	docType := 0
+	switch docTypeStr {
+	case "1":
+		docType = 1
+	case "2":
+		docType = 2
+	}
+
+	recentResponse, err := controller.documentService.GetRecentDocuments(*id, docType)
+	if err != nil {
+		utils.ErrorResponse(ctx, *err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, recentResponse)
 }

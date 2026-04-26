@@ -16,6 +16,8 @@ import (
 	signatureRepository "Microservice/repository/Signature"
 	userRepository "Microservice/repository/User"
 	userLogRepository "Microservice/repository/UserLog"
+	"fmt"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	uuid "github.com/satori/go.uuid"
@@ -867,4 +869,210 @@ func (t DocumentServiceImpl) GetAllAuthorDocuments(authorID string) ([]response.
 	documentResponses := t.mapDocumentsToDocumentResponse(documents)
 
 	return documentResponses, nil
+}
+
+// Threshold untuk menentukan alert_type.
+// Ubah nilai ini sesuai kebutuhan bisnis kantor kamu.
+const (
+	needApprovalWarningDays = 3 // hari: jika surat pending lebih dari ini → warning
+	inProgressWarningDays   = 7 // hari: jika in-progress lebih dari ini → warning
+)
+
+func (t DocumentServiceImpl) GetDashboardSummary(userId string, period string) (*response.DashboardSummaryResponse, *helper.ErrorModel) {
+	raw, fetchErr := t.DocumentRepository.GetDashboardSummary(userId, period)
+	if fetchErr != nil {
+		return nil, fetchErr
+	}
+
+	// ── NeedApproval card ────────────────────────────────────────────────────
+	needApprovalAlertType := "success"
+	needApprovalAlertLabel := "Semua berjalan tepat waktu"
+	if raw.OldestPendingDays >= needApprovalWarningDays || raw.NeedApprovalUrgent > 0 {
+		needApprovalAlertType = "warning"
+		needApprovalAlertLabel = fmt.Sprintf("Terlama: %d hari belum diproses", raw.OldestPendingDays)
+	}
+
+	// ── InProgress card ──────────────────────────────────────────────────────
+	inProgressAlertType := "success"
+	inProgressAlertLabel := "Semua berjalan tepat waktu"
+	if raw.LongestProcessingDays >= inProgressWarningDays {
+		inProgressAlertType = "warning"
+		inProgressAlertLabel = fmt.Sprintf("Paling lama: %d hari belum selesai", raw.LongestProcessingDays)
+	}
+
+	// ── Rejected card ────────────────────────────────────────────────────────
+	rejectedAlertType := "success"
+	rejectedAlertLabel := "Tidak ada surat yang ditolak"
+	if raw.RejectedTotal > 0 {
+		rejectedAlertType = "warning"
+		rejectedAlertLabel = fmt.Sprintf("%d surat perlu revisi segera", raw.MineNeedsRevision)
+	}
+
+	// ── Completed card ───────────────────────────────────────────────────────
+	completedAlertType := "success"
+	completedAlertLabel := "Semua berjalan tepat waktu"
+
+	return &response.DashboardSummaryResponse{
+		Period: period,
+		NeedApproval: response.NeedApprovalCard{
+			Total:             raw.NeedApprovalTotal,
+			Urgent:            raw.NeedApprovalUrgent,
+			Normal:            raw.NeedApprovalNormal,
+			OldestPendingDays: raw.OldestPendingDays,
+			AlertType:         needApprovalAlertType,
+			AlertLabel:        needApprovalAlertLabel,
+		},
+		InProgress: response.InProgressCard{
+			Total:                 raw.InProgressTotal,
+			LongestProcessingDays: raw.LongestProcessingDays,
+			AlertType:             inProgressAlertType,
+			AlertLabel:            inProgressAlertLabel,
+		},
+		Rejected: response.RejectedCard{
+			Total:             raw.RejectedTotal,
+			MineNeedsRevision: raw.MineNeedsRevision,
+			AlertType:         rejectedAlertType,
+			AlertLabel:        rejectedAlertLabel,
+		},
+		Completed: response.CompletedCard{
+			Total:      raw.CompletedTotal,
+			TotalYear:  raw.CompletedTotalYear,
+			AlertType:  completedAlertType,
+			AlertLabel: completedAlertLabel,
+		},
+	}, nil
+}
+
+func (t DocumentServiceImpl) GetDeadlines(userId string) ([]response.DeadlineItemResponse, *helper.ErrorModel) {
+	documents, err := t.DocumentRepository.GetDeadlines(userId)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []response.DeadlineItemResponse
+	now := time.Now()
+
+	for _, doc := range documents {
+		if doc.DueDate == nil {
+			continue
+		}
+
+		daysRemaining := int(doc.DueDate.Sub(now).Hours() / 24)
+
+		result = append(result, response.DeadlineItemResponse{
+			ID:            doc.ID.String(),
+			Subject:       doc.Subject,
+			DaysRemaining: daysRemaining,
+		})
+	}
+
+	return result, nil
+}
+
+func (t DocumentServiceImpl) GetRecentActivities(userId string) ([]response.ActivityResponse, *helper.ErrorModel) {
+	histories, err := t.DocumentRepository.GetRecentActivities(userId)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []response.ActivityResponse
+
+	for _, h := range histories {
+		if h.Document == nil {
+			continue
+		}
+
+		// Ambil nama approver dari UserRepository
+		approver, errUser := t.UserRepository.Get(h.UserID.String(), true)
+		if errUser != nil {
+			continue
+		}
+
+		approverName := approver.FirstName + " " + approver.LastName
+
+		result = append(result, response.ActivityResponse{
+			ID:           h.Document.ID.String(),
+			Subject:      h.Document.Subject,
+			IsApproved:   h.IsApproved,
+			ApproverName: approverName,
+			UpdatedAt:    h.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	return result, nil
+}
+
+func (t DocumentServiceImpl) GetRecentDocuments(userId string, docType int) ([]response.RecentDocumentResponse, *helper.ErrorModel) {
+	documents, err := t.DocumentRepository.GetRecentDocuments(userId, docType)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []response.RecentDocumentResponse
+
+	for _, doc := range documents {
+		// ── Nomor Surat ──────────────────────────────────────────
+		number := "-"
+		if doc.CustomPublicationNumber != nil && *doc.CustomPublicationNumber != "" {
+			number = *doc.CustomPublicationNumber
+		} else {
+			docNumber, _ := t.DocumentNumbersRepository.GetByDocumentID(doc.ID)
+			if docNumber != nil {
+				number = docNumber.Value
+			}
+		}
+
+		// ── Status ───────────────────────────────────────────────
+		statusMap := map[int]string{
+			0:  "Draft",
+			1:  "In Progress",
+			2:  "Selesai",
+			3:  "Cancelled",
+			99: "Ditolak",
+		}
+		statusLabel := statusMap[doc.Status]
+
+		// ── Dari/Kepada ──────────────────────────────────────────
+		fromTo := "-"
+
+		if doc.Status == 99 {
+			// Rejected: cari approver terakhir dari DocumentHistory
+			histories, errHistory := t.DocumentHistoryRepository.GetAllHistoryByDocumentId(doc.ID.String())
+			if errHistory == nil && len(histories) > 0 {
+				latest := histories[0] // sudah di-sort DESC dari repository
+				user, errUser := t.UserRepository.Get(latest.UserID.String(), true)
+				if errUser == nil && user != nil {
+					fromTo = user.FirstName + " " + user.LastName
+				}
+			}
+		} else {
+			// Status lain: cari dari DocumentSequence berdasarkan step saat ini
+			for _, seq := range doc.DocumentSequence {
+				if seq.Step == doc.Step {
+					user, errUser := t.UserRepository.Get(seq.UserID.String(), true)
+					if errUser == nil && user != nil {
+						fromTo = user.FirstName + " " + user.LastName
+					}
+					break
+				}
+			}
+
+			// Fallback: jika tidak ada sequence yang match, pakai nama author
+			if fromTo == "-" && doc.Author != nil {
+				fromTo = doc.Author.FirstName + " " + doc.Author.LastName
+			}
+		}
+
+		result = append(result, response.RecentDocumentResponse{
+			ID:        doc.ID.String(),
+			Number:    number,
+			Subject:   doc.Subject,
+			FromTo:    fromTo,
+			Status:    statusLabel,
+			Type:      doc.Type,
+			UpdatedAt: doc.UpdatedAt.Format(time.RFC3339),
+		})
+	}
+
+	return result, nil
 }

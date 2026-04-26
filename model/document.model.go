@@ -26,6 +26,7 @@ type Document struct {
 	DocumentHistory         []DocumentHistory
 	DocumentAttachment      []DocumentAttachment
 	Recipients              []Recipient
+	DueDate                 *time.Time `gorm:"type:timestamp"`
 	CreatedAt               *time.Time `gorm:"default:now()"`
 	UpdatedAt               *time.Time `gorm:"not null;default:now()"`
 }
