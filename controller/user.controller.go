@@ -237,3 +237,20 @@ func (controller *UserController) UpdateAccess(ctx *gin.Context) {
 		utils.SuccessResponse(ctx, nil)
 	}
 }
+
+func (controller *UserController) UnlockUser(ctx *gin.Context) {
+	userId := ctx.Param("userId")
+	
+	if userId == "" {
+		msg := "User ID is required"
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		return
+	}
+
+	errUnlock := controller.userService.UnlockUser(userId)
+	if errUnlock != nil {
+		utils.ErrorResponse(ctx, *errUnlock)
+	} else {
+		utils.SuccessResponse(ctx, nil)
+	}
+}

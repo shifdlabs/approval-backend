@@ -17,12 +17,14 @@ type User struct {
 	EmployeeID string     `gorm:"type:varchar(100)"`
 	Email      string     `gorm:"type:varchar(100);uniqueIndex;not null"`
 	Password   string     `gorm:"size:255;not null"`
-	Role       int        `gorm:"type:integer"` // 99: admin, 1: user
-	FirstName  string     `gorm:"type:varchar(100)"`
-	LastName   string     `gorm:"type:varchar(100)"`
-	Access     bool       `gorm:"type:boolean"`
-	Phone      string     `gorm:"type:varchar(20)"`
-	Position   *Position  `gorm:"foreignKey:PositionID;constraint:OnDelete:SET NULL;"`
+	Role          int        `gorm:"type:integer"` // 99: admin, 1: user
+	FirstName     string     `gorm:"type:varchar(100)"`
+	LastName      string     `gorm:"type:varchar(100)"`
+	Access        bool       `gorm:"type:boolean"`
+	IsLocked      bool       `gorm:"type:boolean;default:false"`
+	LockTimestamp *time.Time `gorm:"type:timestamp"`
+	Phone         string     `gorm:"type:varchar(20)"`
+	Position      *Position  `gorm:"foreignKey:PositionID;constraint:OnDelete:SET NULL;"`
 	CreatedAt  *time.Time `gorm:"not null;default:now()"`
 	UpdatedAt  *time.Time `gorm:"not null;default:now()"`
 	DeletedAt  *time.Time

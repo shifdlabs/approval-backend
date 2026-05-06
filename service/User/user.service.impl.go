@@ -7,6 +7,7 @@ import (
 	request "Microservice/data/request/User"
 	response "Microservice/data/response/User"
 
+	failedLoginAttemptRepository "Microservice/repository/FailedLoginAttempt"
 	positionRepository "Microservice/repository/Position"
 	repository "Microservice/repository/User"
 
@@ -15,19 +16,22 @@ import (
 )
 
 type UserServiceImpl struct {
-	UserRepository     repository.UserRepository
-	PositionRepository positionRepository.PositionRepository
-	Validate           *validator.Validate
+	UserRepository               repository.UserRepository
+	PositionRepository           positionRepository.PositionRepository
+	FailedLoginAttemptRepository failedLoginAttemptRepository.FailedLoginAttemptRepository
+	Validate                     *validator.Validate
 }
 
 func NewUserServiceImpl(
 	userRepository repository.UserRepository,
 	positionRepository positionRepository.PositionRepository,
+	failedLoginAttemptRepository failedLoginAttemptRepository.FailedLoginAttemptRepository,
 	validate *validator.Validate) UserService {
 	return &UserServiceImpl{
-		UserRepository:     userRepository,
-		PositionRepository: positionRepository,
-		Validate:           validate,
+		UserRepository:               userRepository,
+		PositionRepository:           positionRepository,
+		FailedLoginAttemptRepository: failedLoginAttemptRepository,
+		Validate:                     validate,
 	}
 }
 
@@ -148,6 +152,19 @@ func (t UserServiceImpl) Update(request request.UpdateUserRequest) *helper.Error
 	result.EmployeeID = request.EmployeeID
 	result.Access = request.Access
 	result.Phone = request.Phone
+
+	// If Access is being enabled, also unlock the account and clear failed attempts
+	if request.Access == true && result.IsLocked {
+		result.IsLocked = false
+		result.LockTimestamp = nil
+
+		// Clear all failed login attempts for this user
+		errDeleteAttempts := t.FailedLoginAttemptRepository.DeleteByUserId(result.ID.String())
+		if errDeleteAttempts != nil {
+			// Log error but continue with update
+			helper.GetFileAndLine(errDeleteAttempts)
+		}
+	}
 
 	errUpdate := t.UserRepository.Update(*result)
 
@@ -278,9 +295,49 @@ func (t UserServiceImpl) UpdateAccess(request request.UpdateAccessRequest) *help
 
 	user.Access = request.Access
 
+	// If Access is being enabled, also unlock the account and clear failed attempts
+	if request.Access == true && user.IsLocked {
+		user.IsLocked = false
+		user.LockTimestamp = nil
+
+		// Clear all failed login attempts for this user
+		errDeleteAttempts := t.FailedLoginAttemptRepository.DeleteByUserId(user.ID.String())
+		if errDeleteAttempts != nil {
+			// Log error but continue with update
+			helper.GetFileAndLine(errDeleteAttempts)
+		}
+	}
+
 	errUpdate := t.UserRepository.Update(*user)
 	if errUpdate != nil {
 		return errUpdate
+	}
+
+	return nil
+}
+
+func (t UserServiceImpl) UnlockUser(userId string) *helper.ErrorModel {
+	// Get user by ID
+	user, errGet := t.UserRepository.Get(userId, false)
+	if errGet != nil {
+		return errGet
+	}
+
+	// Reset lock status and enable access
+	user.IsLocked = false
+	user.LockTimestamp = nil
+	user.Access = true
+
+	// Update user in database
+	errUpdate := t.UserRepository.Update(*user)
+	if errUpdate != nil {
+		return errUpdate
+	}
+
+	// Delete all failed login attempts for this user
+	errDelete := t.FailedLoginAttemptRepository.DeleteByUserId(userId)
+	if errDelete != nil {
+		return errDelete
 	}
 
 	return nil
