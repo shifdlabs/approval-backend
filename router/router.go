@@ -96,6 +96,8 @@ func NewRouter(
 	protectedUserRouter.PUT("/access", userController.UpdateAccess)
 	protectedUserRouter.PUT("/biodata", userController.UpdateBiodata)
 	protectedUserRouter.PUT("/email", userController.UpdateEmail)
+	protectedUserRouter.POST("/import/preview", userController.PreviewImport)
+	protectedUserRouter.POST("/import/bulk", userController.BulkImport)
 
 	protectedDocumentRouter := router.Group("/document")
 	protectedDocumentRouter.Use(middleware.DeserializeUser(Db))

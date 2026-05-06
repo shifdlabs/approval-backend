@@ -58,6 +58,21 @@ func (t *PositionRepositoryImpl) GetAll() ([]model.Position, *helper.ErrorModel)
 	return positions, nil
 }
 
+func (t *PositionRepositoryImpl) FindByName(name string) (*model.Position, *helper.ErrorModel) {
+	var position model.Position
+
+	result := t.Db.Where("LOWER(name) = LOWER(?)", name).First(&position)
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			return nil, nil // Return nil without error if not found
+		}
+		msg := "Failed to Find Position by Name"
+		return nil, helper.ErrorCatcher(result.Error, 500, &msg)
+	}
+
+	return &position, nil
+}
+
 func (t *PositionRepositoryImpl) Update(position model.Position) *helper.ErrorModel {
 	var existing model.Position
 
