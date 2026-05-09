@@ -255,8 +255,8 @@ func (controller *UserController) PreviewImport(ctx *gin.Context) {
 	}
 
 	// Validate file extension
-	if !strings.HasSuffix(strings.ToLower(file.Filename), ".xlsx") && 
-	   !strings.HasSuffix(strings.ToLower(file.Filename), ".xls") {
+	if !strings.HasSuffix(strings.ToLower(file.Filename), ".xlsx") &&
+		!strings.HasSuffix(strings.ToLower(file.Filename), ".xls") {
 		msg := "Only Excel files (.xlsx, .xls) are allowed"
 		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
 		return
@@ -267,6 +267,23 @@ func (controller *UserController) PreviewImport(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *errResponse)
 	} else {
 		utils.SuccessResponse(ctx, previewResponse)
+	}
+}
+
+func (controller *UserController) UnlockUser(ctx *gin.Context) {
+	userId := ctx.Param("userId")
+
+	if userId == "" {
+		msg := "User ID is required"
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		return
+	}
+
+	errUnlock := controller.userService.UnlockUser(userId)
+	if errUnlock != nil {
+		utils.ErrorResponse(ctx, *errUnlock)
+	} else {
+		utils.SuccessResponse(ctx, nil)
 	}
 }
 
