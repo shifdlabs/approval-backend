@@ -24,4 +24,5 @@ type UserService interface {
 
 	PreviewImport(file *multipart.FileHeader, columnMappingJSON string) (*response.PreviewImportResponse, *helper.ErrorModel)
 	BulkImport(request request.BulkImportUsersRequest) (*response.BulkImportResponse, *helper.ErrorModel)
+	UnlockUser(userId string) *helper.ErrorModel
 }
