@@ -1076,3 +1076,35 @@ func (t DocumentServiceImpl) GetRecentDocuments(userId string, docType int) ([]r
 
 	return result, nil
 }
+
+func (s *DocumentServiceImpl) Search(keyword string) ([]response.SearchDocumentResponse, *helper.ErrorModel) {
+	documents, err := s.DocumentRepository.Search(keyword)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []response.SearchDocumentResponse
+	for _, doc := range documents {
+		var docNumber *string
+
+		switch doc.PublicationNumberType {
+		case 1, 2:
+			docNum, errDocNum := s.DocumentNumbersRepository.GetByDocumentID(doc.ID)
+			if errDocNum == nil && docNum != nil {
+				docNumber = &docNum.Value
+			}
+		case 3:
+			docNumber = doc.CustomPublicationNumber
+		case 4:
+			docNumber = nil
+		}
+
+		results = append(results, response.SearchDocumentResponse{
+			ID:             doc.ID,
+			Subject:        doc.Subject,
+			DocumentNumber: docNumber,
+		})
+	}
+
+	return results, nil
+}
