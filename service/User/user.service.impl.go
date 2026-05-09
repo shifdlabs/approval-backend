@@ -3,6 +3,11 @@ package user
 import (
 	"Microservice/helper"
 	"Microservice/model"
+	"encoding/json"
+	"fmt"
+	"mime/multipart"
+	"strconv"
+	"strings"
 
 	request "Microservice/data/request/User"
 	response "Microservice/data/response/User"
@@ -12,6 +17,7 @@ import (
 	repository "Microservice/repository/User"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/xuri/excelize/v2"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -314,6 +320,308 @@ func (t UserServiceImpl) UpdateAccess(request request.UpdateAccessRequest) *help
 	}
 
 	return nil
+}
+
+func (t UserServiceImpl) PreviewImport(fileHeader *multipart.FileHeader, columnMappingJSON string) (*response.PreviewImportResponse, *helper.ErrorModel) {
+	// Parse column mapping
+	var columnMapping map[string]string
+	if err := json.Unmarshal([]byte(columnMappingJSON), &columnMapping); err != nil {
+		msg := "Invalid column mapping format"
+		return nil, &helper.ErrorModel{Code: 400, Message: msg}
+	}
+
+	// Open uploaded file
+	file, err := fileHeader.Open()
+	if err != nil {
+		msg := "Failed to open file"
+		return nil, &helper.ErrorModel{Code: 500, Message: msg}
+	}
+	defer file.Close()
+
+	// Read Excel file
+	excelFile, err := excelize.OpenReader(file)
+	if err != nil {
+		msg := "Failed to read Excel file"
+		return nil, &helper.ErrorModel{Code: 400, Message: msg}
+	}
+	defer excelFile.Close()
+
+	// Get first sheet
+	sheetName := excelFile.GetSheetName(0)
+	rows, err := excelFile.GetRows(sheetName)
+	if err != nil || len(rows) == 0 {
+		msg := "Excel file is empty or invalid"
+		return nil, &helper.ErrorModel{Code: 400, Message: msg}
+	}
+
+	// Get header row and create column index map
+	headerRow := rows[0]
+	columnIndexes := make(map[string]int)
+	for i, header := range headerRow {
+		// Store with lowercase and trimmed for case-insensitive matching
+		normalizedHeader := strings.ToLower(strings.TrimSpace(header))
+		columnIndexes[normalizedHeader] = i
+	}
+
+	// Parse data rows
+	var users []request.ImportedUserData
+	var errors []response.ImportError
+	var warnings []response.ImportWarning
+
+	for rowIndex, row := range rows[1:] { // Skip header row
+		actualRow := rowIndex + 2 // Excel row number (1-indexed + header)
+
+		user := request.ImportedUserData{}
+		hasError := false
+
+		// Map columns based on user-provided mapping
+		if colName, ok := columnMapping["employeeID"]; ok && colName != "" {
+			normalizedColName := strings.ToLower(strings.TrimSpace(colName))
+			if colIndex, exists := columnIndexes[normalizedColName]; exists && colIndex < len(row) {
+				user.EmployeeID = strings.TrimSpace(row[colIndex])
+			}
+		}
+
+		if colName, ok := columnMapping["email"]; ok && colName != "" {
+			normalizedColName := strings.ToLower(strings.TrimSpace(colName))
+			if colIndex, exists := columnIndexes[normalizedColName]; exists && colIndex < len(row) {
+				user.Email = strings.TrimSpace(row[colIndex])
+				if user.Email == "" {
+					errors = append(errors, response.ImportError{
+						Row:     actualRow,
+						Field:   "email",
+						Message: "Email is required",
+					})
+					hasError = true
+				}
+			} else {
+				errors = append(errors, response.ImportError{
+					Row:     actualRow,
+					Field:   "email",
+					Message: "Email column not found",
+				})
+				hasError = true
+			}
+		}
+
+		if colName, ok := columnMapping["firstName"]; ok && colName != "" {
+			normalizedColName := strings.ToLower(strings.TrimSpace(colName))
+			if colIndex, exists := columnIndexes[normalizedColName]; exists && colIndex < len(row) {
+				user.FirstName = strings.TrimSpace(row[colIndex])
+			}
+		}
+
+		if colName, ok := columnMapping["lastName"]; ok && colName != "" {
+			normalizedColName := strings.ToLower(strings.TrimSpace(colName))
+			if colIndex, exists := columnIndexes[normalizedColName]; exists && colIndex < len(row) {
+				user.LastName = strings.TrimSpace(row[colIndex])
+			}
+		}
+
+		if colName, ok := columnMapping["phone"]; ok && colName != "" {
+			normalizedColName := strings.ToLower(strings.TrimSpace(colName))
+			if colIndex, exists := columnIndexes[normalizedColName]; exists && colIndex < len(row) {
+				user.Phone = strings.TrimSpace(row[colIndex])
+			}
+		}
+
+		if colName, ok := columnMapping["role"]; ok && colName != "" {
+			normalizedColName := strings.ToLower(strings.TrimSpace(colName))
+			if colIndex, exists := columnIndexes[normalizedColName]; exists && colIndex < len(row) {
+				roleStr := strings.TrimSpace(row[colIndex])
+				if roleInt, err := strconv.Atoi(roleStr); err == nil {
+					user.Role = roleInt
+				} else {
+					warnings = append(warnings, response.ImportWarning{
+						Row:     actualRow,
+						Field:   "role",
+						Message: "Invalid role value",
+					})
+				}
+			}
+		}
+		// Note: No default role in preview - will be set during bulk insert
+
+		if colName, ok := columnMapping["positionID"]; ok && colName != "" {
+			normalizedColName := strings.ToLower(strings.TrimSpace(colName))
+			if colIndex, exists := columnIndexes[normalizedColName]; exists && colIndex < len(row) {
+				user.PositionID = strings.TrimSpace(row[colIndex])
+			}
+		}
+
+		// Position lookup by name
+		if colName, ok := columnMapping["position"]; ok && colName != "" {
+			normalizedColName := strings.ToLower(strings.TrimSpace(colName))
+			if colIndex, exists := columnIndexes[normalizedColName]; exists && colIndex < len(row) {
+				positionName := strings.TrimSpace(row[colIndex])
+				if positionName != "" {
+					// Lookup position by name (case-insensitive)
+					foundPosition, errPosition := t.PositionRepository.FindByName(positionName)
+					if errPosition != nil {
+						// Database error - show warning
+						warnings = append(warnings, response.ImportWarning{
+							Row:     actualRow,
+							Field:   "position",
+							Message: fmt.Sprintf("Error looking up position '%s'", positionName),
+						})
+					} else if foundPosition != nil {
+						// Position found, use its ID
+						user.PositionID = foundPosition.ID.String()
+					} else {
+						// Position not found, silently default to "Staff"
+						staffPosition, errStaff := t.PositionRepository.FindByName("Staff")
+						if errStaff == nil && staffPosition != nil {
+							user.PositionID = staffPosition.ID.String()
+							// No warning - silent fallback to Staff
+						} else {
+							// Only warn if Staff position doesn't exist (critical case)
+							warnings = append(warnings, response.ImportWarning{
+								Row:     actualRow,
+								Field:   "position",
+								Message: "No 'Staff' position found in database for default",
+							})
+						}
+					}
+				}
+			}
+		}
+
+		// Password defaults will be handled during bulk insert
+		if colName, ok := columnMapping["password"]; ok && colName != "" {
+			normalizedColName := strings.ToLower(strings.TrimSpace(colName))
+			if colIndex, exists := columnIndexes[normalizedColName]; exists && colIndex < len(row) {
+				user.Password = strings.TrimSpace(row[colIndex])
+			}
+		}
+
+		if !hasError {
+			users = append(users, user)
+		}
+	}
+
+	return &response.PreviewImportResponse{
+		Users:    users,
+		Errors:   errors,
+		Warnings: warnings,
+	}, nil
+}
+
+func (t UserServiceImpl) BulkImport(importRequest request.BulkImportUsersRequest) (*response.BulkImportResponse, *helper.ErrorModel) {
+	errStructure := t.Validate.Struct(importRequest)
+	if errStructure != nil {
+		msg := "Structure Error"
+		return nil, helper.ErrorCatcher(errStructure, 500, &msg)
+	}
+
+	var successCount, failedCount int
+	var errors []response.ImportError
+
+	fmt.Printf("Starting bulk import for %d users\n", len(importRequest.Users))
+
+	for i, userData := range importRequest.Users {
+		rowNum := i + 2 // Excel row number (1-indexed + header)
+
+		fmt.Printf("Processing row %d: %s\n", rowNum, userData.Email)
+
+		// Validate email
+		if userData.Email == "" {
+			errors = append(errors, response.ImportError{
+				Row:     rowNum,
+				Field:   "email",
+				Message: "Email is required",
+			})
+			failedCount++
+			fmt.Printf("Row %d failed: Email is required\n", rowNum)
+			continue
+		}
+
+		// Check if email already exists
+		existingUser, _ := t.UserRepository.GetByEmail(userData.Email)
+		if existingUser != nil {
+			errors = append(errors, response.ImportError{
+				Row:     rowNum,
+				Field:   "email",
+				Message: fmt.Sprintf("Email %s already exists", userData.Email),
+			})
+			failedCount++
+			fmt.Printf("Row %d failed: Email %s already exists\n", rowNum, userData.Email)
+			continue
+		}
+
+		// Get position if PositionID provided
+		var position *model.Position
+		if userData.PositionID != "" {
+			fmt.Printf("Looking up position ID: %s\n", userData.PositionID)
+			result, errGetPosition := t.PositionRepository.Get(userData.PositionID)
+			if errGetPosition != nil {
+				errors = append(errors, response.ImportError{
+					Row:     rowNum,
+					Field:   "positionID",
+					Message: fmt.Sprintf("Position ID %s not found or invalid: %s", userData.PositionID, errGetPosition.Message),
+				})
+				failedCount++
+				fmt.Printf("Row %d failed: Position ID lookup error: %s\n", rowNum, errGetPosition.Message)
+				continue
+			}
+			position = result
+			fmt.Printf("Position found: %s\n", position.Name)
+		}
+
+		password := userData.Password
+		if importRequest.CustomPassword != "" {
+			password = importRequest.CustomPassword
+		} else if password == "" {
+			password = "password123"
+		}
+
+		role := userData.Role
+		if role == 0 {
+			role = 1
+		}
+
+		hashedPassword, errBcrypt := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if errBcrypt != nil {
+			errors = append(errors, response.ImportError{
+				Row:     rowNum,
+				Field:   "password",
+				Message: "Failed to encrypt password",
+			})
+			failedCount++
+			continue
+		}
+
+		// Create new user
+		newUser := model.User{
+			Position:   position,
+			EmployeeID: userData.EmployeeID,
+			Email:      userData.Email,
+			Password:   string(hashedPassword),
+			Role:       role,
+			FirstName:  userData.FirstName,
+			LastName:   userData.LastName,
+			Access:     true, // Default to true
+			Phone:      userData.Phone,
+		}
+
+		errCreateUser := t.UserRepository.Create(newUser)
+		if errCreateUser != nil {
+			errors = append(errors, response.ImportError{
+				Row:     rowNum,
+				Field:   "general",
+				Message: errCreateUser.Message,
+			})
+			failedCount++
+			continue
+		}
+
+		successCount++
+	}
+
+	return &response.BulkImportResponse{
+		SuccessCount: successCount,
+		FailedCount:  failedCount,
+		Errors:       errors,
+	}, nil
 }
 
 func (t UserServiceImpl) UnlockUser(userId string) *helper.ErrorModel {

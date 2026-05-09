@@ -5,6 +5,7 @@ import (
 	"Microservice/helper"
 	service "Microservice/service/User"
 	"Microservice/utils"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -238,9 +239,40 @@ func (controller *UserController) UpdateAccess(ctx *gin.Context) {
 	}
 }
 
+func (controller *UserController) PreviewImport(ctx *gin.Context) {
+	file, err := ctx.FormFile("file")
+	if err != nil {
+		msg := "File is required"
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		return
+	}
+
+	columnMappingJSON := ctx.PostForm("columnMapping")
+	if columnMappingJSON == "" {
+		msg := "Column mapping is required"
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		return
+	}
+
+	// Validate file extension
+	if !strings.HasSuffix(strings.ToLower(file.Filename), ".xlsx") &&
+		!strings.HasSuffix(strings.ToLower(file.Filename), ".xls") {
+		msg := "Only Excel files (.xlsx, .xls) are allowed"
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		return
+	}
+
+	previewResponse, errResponse := controller.userService.PreviewImport(file, columnMappingJSON)
+	if errResponse != nil {
+		utils.ErrorResponse(ctx, *errResponse)
+	} else {
+		utils.SuccessResponse(ctx, previewResponse)
+	}
+}
+
 func (controller *UserController) UnlockUser(ctx *gin.Context) {
 	userId := ctx.Param("userId")
-	
+
 	if userId == "" {
 		msg := "User ID is required"
 		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
@@ -252,5 +284,23 @@ func (controller *UserController) UnlockUser(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *errUnlock)
 	} else {
 		utils.SuccessResponse(ctx, nil)
+	}
+}
+
+func (controller *UserController) BulkImport(ctx *gin.Context) {
+	var payload request.BulkImportUsersRequest
+	errBindJSON := ctx.ShouldBindJSON(&payload)
+
+	if errBindJSON != nil {
+		msg := "Bad Request"
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		return
+	}
+
+	importResponse, errResponse := controller.userService.BulkImport(payload)
+	if errResponse != nil {
+		utils.ErrorResponse(ctx, *errResponse)
+	} else {
+		utils.SuccessResponse(ctx, importResponse)
 	}
 }

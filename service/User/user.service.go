@@ -4,6 +4,7 @@ import (
 	request "Microservice/data/request/User"
 	response "Microservice/data/response/User"
 	"Microservice/helper"
+	"mime/multipart"
 )
 
 type UserService interface {
@@ -20,5 +21,8 @@ type UserService interface {
 	UpdateRole(request request.UpdateRoleRequest) *helper.ErrorModel
 	UpdatePassword(request request.UpdatePasswordRequest) *helper.ErrorModel
 	UpdateAccess(request request.UpdateAccessRequest) *helper.ErrorModel
+
+	PreviewImport(file *multipart.FileHeader, columnMappingJSON string) (*response.PreviewImportResponse, *helper.ErrorModel)
+	BulkImport(request request.BulkImportUsersRequest) (*response.BulkImportResponse, *helper.ErrorModel)
 	UnlockUser(userId string) *helper.ErrorModel
 }
