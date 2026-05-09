@@ -444,3 +444,19 @@ func (controller *DocumentController) GetRecentDocuments(ctx *gin.Context) {
 
 	utils.SuccessResponse(ctx, recentResponse)
 }
+
+func (controller *DocumentController) Search(ctx *gin.Context) {
+	keyword := ctx.Query("q")
+	if keyword == "" {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Keyword tidak boleh kosong."})
+		return
+	}
+
+	result, err := controller.documentService.Search(keyword)
+	if err != nil {
+		utils.ErrorResponse(ctx, *err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, result)
+}

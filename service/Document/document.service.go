@@ -32,4 +32,5 @@ type DocumentService interface {
 	GetDeadlines(userId string) ([]response.DeadlineItemResponse, *helper.ErrorModel)
 	GetRecentActivities(userId string) ([]response.ActivityResponse, *helper.ErrorModel)
 	GetRecentDocuments(userId string, docType int) ([]response.RecentDocumentResponse, *helper.ErrorModel)
+	Search(keyword string) ([]response.SearchDocumentResponse, *helper.ErrorModel)
 }

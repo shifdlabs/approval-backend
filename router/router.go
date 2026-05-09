@@ -118,6 +118,7 @@ func NewRouter(
 	protectedDocumentRouter.GET("/dashboard/deadlines", documentController.GetDeadlines)
 	protectedDocumentRouter.GET("/dashboard/activities", documentController.GetRecentActivities)
 	protectedDocumentRouter.GET("/dashboard/recent", documentController.GetRecentDocuments)
+	protectedDocumentRouter.GET("/search", documentController.Search)
 
 	protectedDocumentHistoryRouter := router.Group("/documenthistory")
 	protectedDocumentHistoryRouter.Use(middleware.DeserializeUser(Db))

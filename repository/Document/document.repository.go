@@ -30,4 +30,5 @@ type DocumentRepository interface {
 	GetDeadlines(userId string) ([]model.Document, *helper.ErrorModel)
 	GetRecentActivities(userId string) ([]model.DocumentHistory, *helper.ErrorModel)
 	GetRecentDocuments(userId string, docType int) ([]model.Document, *helper.ErrorModel)
+	Search(keyword string) ([]model.Document, *helper.ErrorModel)
 }

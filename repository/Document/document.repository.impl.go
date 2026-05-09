@@ -5,6 +5,7 @@ import (
 	"Microservice/helper"
 	"Microservice/model"
 	"errors"
+	"strings"
 
 	uuid "github.com/satori/go.uuid"
 	"gorm.io/gorm"
@@ -617,5 +618,29 @@ func (t *DocumentRepositoryImpl) GetRecentDocuments(userId string, docType int) 
 		return nil, helper.ErrorCatcher(result.Error, 500, &msg)
 	}
 
+	return documents, nil
+}
+
+func (r *DocumentRepositoryImpl) Search(keyword string) ([]model.Document, *helper.ErrorModel) {
+	var documents []model.Document
+
+	// Lowercase keyword sebelum dipakai
+	likeKeyword := "%" + strings.ToLower(keyword) + "%"
+
+	err := r.Db.
+		Joins("LEFT JOIN document_numbers dn ON dn.document_id = documents.id AND dn.deleted_at IS NULL").
+		Where(`
+            documents.deleted_at IS NULL
+            AND (
+                LOWER(documents.subject) LIKE ?
+                OR (documents.publication_number_type IN (1,2) AND LOWER(dn.value) LIKE ?)
+                OR (documents.publication_number_type = 3 AND LOWER(documents.custom_publication_number) LIKE ?)
+            )
+        `, likeKeyword, likeKeyword, likeKeyword).
+		Find(&documents).Error
+
+	if err != nil {
+		return nil, &helper.ErrorModel{Code: 500, Message: err.Error()}
+	}
 	return documents, nil
 }
