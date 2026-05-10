@@ -442,43 +442,36 @@ func (t UserServiceImpl) PreviewImport(fileHeader *multipart.FileHeader, columnM
 		}
 		// Note: No default role in preview - will be set during bulk insert
 
+		// Position lookup - supports both name and UUID
 		if colName, ok := columnMapping["positionID"]; ok && colName != "" {
 			normalizedColName := strings.ToLower(strings.TrimSpace(colName))
 			if colIndex, exists := columnIndexes[normalizedColName]; exists && colIndex < len(row) {
-				user.PositionID = strings.TrimSpace(row[colIndex])
-			}
-		}
-
-		// Position lookup by name
-		if colName, ok := columnMapping["position"]; ok && colName != "" {
-			normalizedColName := strings.ToLower(strings.TrimSpace(colName))
-			if colIndex, exists := columnIndexes[normalizedColName]; exists && colIndex < len(row) {
-				positionName := strings.TrimSpace(row[colIndex])
-				if positionName != "" {
-					// Lookup position by name (case-insensitive)
-					foundPosition, errPosition := t.PositionRepository.FindByName(positionName)
+				positionValue := strings.TrimSpace(row[colIndex])
+				if positionValue != "" {
+					// Try lookup by name first (case-insensitive)
+					foundPosition, errPosition := t.PositionRepository.FindByName(positionValue)
 					if errPosition != nil {
 						// Database error - show warning
 						warnings = append(warnings, response.ImportWarning{
 							Row:     actualRow,
 							Field:   "position",
-							Message: fmt.Sprintf("Error looking up position '%s'", positionName),
+							Message: fmt.Sprintf("Error looking up position '%s'", positionValue),
 						})
 					} else if foundPosition != nil {
-						// Position found, use its ID
+						// Position found by name, use its ID
 						user.PositionID = foundPosition.ID.String()
 					} else {
-						// Position not found, silently default to "Staff"
+						// Position not found by name, default to "Staff"
 						staffPosition, errStaff := t.PositionRepository.FindByName("Staff")
 						if errStaff == nil && staffPosition != nil {
 							user.PositionID = staffPosition.ID.String()
-							// No warning - silent fallback to Staff
+							// Silent fallback - no warning
 						} else {
-							// Only warn if Staff position doesn't exist (critical case)
+							// Staff position not found (critical case)
 							warnings = append(warnings, response.ImportWarning{
 								Row:     actualRow,
 								Field:   "position",
-								Message: "No 'Staff' position found in database for default",
+								Message: fmt.Sprintf("Position '%s' not found and no 'Staff' default available", positionValue),
 							})
 						}
 					}
@@ -551,20 +544,47 @@ func (t UserServiceImpl) BulkImport(importRequest request.BulkImportUsersRequest
 		// Get position if PositionID provided
 		var position *model.Position
 		if userData.PositionID != "" {
-			fmt.Printf("Looking up position ID: %s\n", userData.PositionID)
+			fmt.Printf("Looking up position: %s\n", userData.PositionID)
 			result, errGetPosition := t.PositionRepository.Get(userData.PositionID)
 			if errGetPosition != nil {
-				errors = append(errors, response.ImportError{
-					Row:     rowNum,
-					Field:   "positionID",
-					Message: fmt.Sprintf("Position ID %s not found or invalid: %s", userData.PositionID, errGetPosition.Message),
-				})
-				failedCount++
-				fmt.Printf("Row %d failed: Position ID lookup error: %s\n", rowNum, errGetPosition.Message)
-				continue
+				foundPosition, errFindByName := t.PositionRepository.FindByName(userData.PositionID)
+				if errFindByName != nil {
+					errors = append(errors, response.ImportError{
+						Row:     rowNum,
+						Field:   "positionID",
+						Message: fmt.Sprintf("Error looking up position '%s': %s", userData.PositionID, errFindByName.Message),
+					})
+					failedCount++
+					fmt.Printf("Row %d failed: Position lookup error\n", rowNum)
+					continue
+				}
+				
+				if foundPosition != nil {
+					// Position found by name
+					position = foundPosition
+					fmt.Printf("Position found by name: %s (ID: %s)\n", position.Name, position.ID.String())
+				} else {
+					// Position not found, try default to Staff
+					staffPosition, errStaff := t.PositionRepository.FindByName("Staff")
+					if errStaff == nil && staffPosition != nil {
+						position = staffPosition
+						fmt.Printf("Position not found, defaulting to Staff\n")
+					} else {
+						errors = append(errors, response.ImportError{
+							Row:     rowNum,
+							Field:   "positionID",
+							Message: fmt.Sprintf("Position '%s' not found and no Staff default available", userData.PositionID),
+						})
+						failedCount++
+						fmt.Printf("Row %d failed: Position not found\n", rowNum)
+						continue
+					}
+				}
+			} else {
+				// Valid UUID, position found
+				position = result
+				fmt.Printf("Position found by UUID: %s (ID: %s)\n", position.Name, position.ID.String())
 			}
-			position = result
-			fmt.Printf("Position found: %s\n", position.Name)
 		}
 
 		password := userData.Password
