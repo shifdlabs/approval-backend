@@ -5,8 +5,6 @@ import (
 	"Microservice/helper/enums"
 	"Microservice/model"
 	"Microservice/utils"
-	"fmt"
-	"time"
 
 	request "Microservice/data/request/NumberingGroup"
 	service "Microservice/service/NumberingGroup"
@@ -28,34 +26,26 @@ func (controller *NumberingGroupController) Get(ctx *gin.Context) {
 	stringID := ctx.Param("id")
 
 	numberingGroupResponse, err := controller.numberingGroupService.Get(stringID)
-
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, numberingGroupResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, numberingGroupResponse)
 }
 
 func (controller *NumberingGroupController) GetAll(ctx *gin.Context) {
-	startTime := time.Now()
 	numberingGroupResponse, err := controller.numberingGroupService.GetAll()
-
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, numberingGroupResponse)
+		return
 	}
-	duration := time.Since(startTime)
-	fmt.Printf("GetAll took %s\n", duration)
+	utils.SuccessResponse(ctx, numberingGroupResponse)
 }
 
 func (controller *NumberingGroupController) Create(ctx *gin.Context) {
 	var payload request.NumberingGroupRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
@@ -65,11 +55,11 @@ func (controller *NumberingGroupController) Create(ctx *gin.Context) {
 	}
 
 	err := controller.numberingGroupService.Create(payload)
+	if err != nil {
+		utils.ErrorResponse(ctx, *err)
+		return
+	}
 
-	res := *helper.GetUserUUID(ctx)
-	fmt.Println("ID: ", res)
-
-	// Action Log
 	controller.userLogService.CreateLog(
 		model.UserLog{
 			UserID: *helper.GetUserUUID(ctx),
@@ -79,18 +69,17 @@ func (controller *NumberingGroupController) Create(ctx *gin.Context) {
 		},
 	)
 
-	if err != nil {
-		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
-	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *NumberingGroupController) Delete(ctx *gin.Context) {
 	stringID := ctx.Param("id")
 	errResponse := controller.numberingGroupService.Delete(stringID)
+	if errResponse != nil {
+		utils.ErrorResponse(ctx, *errResponse)
+		return
+	}
 
-	// Action Log
 	controller.userLogService.CreateLog(
 		model.UserLog{
 			UserID: *helper.GetUserUUID(ctx),
@@ -99,9 +88,5 @@ func (controller *NumberingGroupController) Delete(ctx *gin.Context) {
 		},
 	)
 
-	if errResponse != nil {
-		utils.ErrorResponse(ctx, *errResponse)
-	} else {
-		utils.SuccessResponse(ctx, nil)
-	}
+	utils.SuccessResponse(ctx, nil)
 }

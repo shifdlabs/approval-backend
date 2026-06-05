@@ -5,7 +5,6 @@ import (
 	"Microservice/helper/enums"
 	"Microservice/model"
 	"Microservice/utils"
-	"fmt"
 
 	request "Microservice/data/request/NumberingFormat"
 	service "Microservice/service/NumberingFormat"
@@ -25,11 +24,8 @@ func NewNumberingFormatController(service service.NumberingFormatService, userLo
 
 func (controller *NumberingFormatController) Create(ctx *gin.Context) {
 	var payload request.NumberingFormatRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
@@ -39,11 +35,11 @@ func (controller *NumberingFormatController) Create(ctx *gin.Context) {
 	}
 
 	err := controller.numberingFormatService.Create(payload)
+	if err != nil {
+		utils.ErrorResponse(ctx, *err)
+		return
+	}
 
-	res := *helper.GetUserUUID(ctx)
-	fmt.Println("ID: ", res)
-
-	// Action Log
 	controller.userLogService.CreateLog(
 		model.UserLog{
 			UserID: *helper.GetUserUUID(ctx),
@@ -53,38 +49,35 @@ func (controller *NumberingFormatController) Create(ctx *gin.Context) {
 		},
 	)
 
-	if err != nil {
-		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
-	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *NumberingFormatController) GetAll(ctx *gin.Context) {
 	documentSequenceResponse, errDocumentSequenceResponse := controller.numberingFormatService.GetAll()
-
 	if errDocumentSequenceResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentSequenceResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentSequenceResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, documentSequenceResponse)
 }
 
 func (controller *NumberingFormatController) GetAllWithGrouped(ctx *gin.Context) {
 	documentSequenceResponse, errDocumentSequenceResponse := controller.numberingFormatService.GetAllWithGrouped()
-
 	if errDocumentSequenceResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentSequenceResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentSequenceResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, documentSequenceResponse)
 }
 
 func (controller *NumberingFormatController) Delete(ctx *gin.Context) {
 	stringID := ctx.Param("id")
 	errResponse := controller.numberingFormatService.Delete(stringID)
+	if errResponse != nil {
+		utils.ErrorResponse(ctx, *errResponse)
+		return
+	}
 
-	// Action Log
 	controller.userLogService.CreateLog(
 		model.UserLog{
 			UserID: *helper.GetUserUUID(ctx),
@@ -93,9 +86,5 @@ func (controller *NumberingFormatController) Delete(ctx *gin.Context) {
 		},
 	)
 
-	if errResponse != nil {
-		utils.ErrorResponse(ctx, *errResponse)
-	} else {
-		utils.SuccessResponse(ctx, nil)
-	}
+	utils.SuccessResponse(ctx, nil)
 }

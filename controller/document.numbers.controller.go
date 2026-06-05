@@ -41,6 +41,10 @@ func (controller *DocumentNumbersController) Create(ctx *gin.Context) {
 	}
 
 	err := controller.documentNumbersService.Create(payload, *id, nil, enums.Booked)
+	if err != nil {
+		utils.ErrorResponse(ctx, *err)
+		return
+	}
 
 	controller.userLogService.CreateLog(
 		model.UserLog{
@@ -51,20 +55,16 @@ func (controller *DocumentNumbersController) Create(ctx *gin.Context) {
 		},
 	)
 
-	if err != nil {
-		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
-	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *DocumentNumbersController) GetAll(ctx *gin.Context) {
 	documentNumbers, errDocumentNumbersResponse := controller.documentNumbersService.GetAll()
 	if errDocumentNumbersResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentNumbersResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentNumbers)
+		return
 	}
+	utils.SuccessResponse(ctx, documentNumbers)
 }
 
 func (controller *DocumentNumbersController) GetAllByUserId(ctx *gin.Context) {
@@ -77,14 +77,18 @@ func (controller *DocumentNumbersController) GetAllByUserId(ctx *gin.Context) {
 	documentNumbers, errDocumentNumbersResponse := controller.documentNumbersService.GetAllByUserId(*id)
 	if errDocumentNumbersResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentNumbersResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentNumbers)
+		return
 	}
+	utils.SuccessResponse(ctx, documentNumbers)
 }
 
 func (controller *DocumentNumbersController) Delete(ctx *gin.Context) {
 	stringID := ctx.Param("id")
 	errResponse := controller.documentNumbersService.Delete(stringID)
+	if errResponse != nil {
+		utils.ErrorResponse(ctx, *errResponse)
+		return
+	}
 
 	controller.userLogService.CreateLog(
 		model.UserLog{
@@ -94,9 +98,5 @@ func (controller *DocumentNumbersController) Delete(ctx *gin.Context) {
 		},
 	)
 
-	if errResponse != nil {
-		utils.ErrorResponse(ctx, *errResponse)
-	} else {
-		utils.SuccessResponse(ctx, nil)
-	}
+	utils.SuccessResponse(ctx, nil)
 }

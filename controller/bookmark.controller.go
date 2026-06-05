@@ -18,14 +18,10 @@ func NewBookmarkController(service service.BookmarkService) *BookmarkController 
 	return &BookmarkController{bookmarkService: service}
 }
 
-// AddBookmarkHandler menangani penambahan bookmark
 func (controller *BookmarkController) AddBookmarkHandler(ctx *gin.Context) {
 	var payload request.BookmarkRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
@@ -37,19 +33,15 @@ func (controller *BookmarkController) AddBookmarkHandler(ctx *gin.Context) {
 	err := controller.bookmarkService.AddBookmark(payload)
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
-// RemoveBookmarkHandler menangani penghapusan bookmark
 func (controller *BookmarkController) RemoveBookmarkHandler(ctx *gin.Context) {
 	var payload request.BookmarkRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
@@ -61,19 +53,15 @@ func (controller *BookmarkController) RemoveBookmarkHandler(ctx *gin.Context) {
 	err := controller.bookmarkService.RemoveBookmark(payload)
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
-// IsBookmarkedHandler memeriksa apakah dokumen sudah di-bookmark
 func (controller *BookmarkController) IsBookmarkedHandler(ctx *gin.Context) {
 	var payload request.BookmarkRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
@@ -85,27 +73,22 @@ func (controller *BookmarkController) IsBookmarkedHandler(ctx *gin.Context) {
 	isBookmarked, err := controller.bookmarkService.IsBookmarked(payload)
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, gin.H{
-			"isBookmarked": isBookmarked,
-		})
+		return
 	}
+	utils.SuccessResponse(ctx, gin.H{"isBookmarked": isBookmarked})
 }
 
 func (controller *BookmarkController) GetAllBookmarksWithDocumentsHandler(ctx *gin.Context) {
-	// Ambil userId menggunakan helper
 	id, errParse := helper.GetUserId(ctx)
 	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
 		return
 	}
 
-	// Panggil service untuk mendapatkan dokumen berdasarkan userId
 	documents, err := controller.bookmarkService.GetAllBookmarksWithDocuments(*id)
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, documents)
+		return
 	}
+	utils.SuccessResponse(ctx, documents)
 }

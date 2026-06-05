@@ -30,9 +30,9 @@ func (controller *UserController) Get(ctx *gin.Context) {
 	userResponse, errResponse := controller.userService.Get(*stringID)
 	if errResponse != nil {
 		utils.ErrorResponse(ctx, *errResponse)
-	} else {
-		utils.SuccessResponse(ctx, userResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, userResponse)
 }
 
 func (controller *UserController) GetUserByID(ctx *gin.Context) {
@@ -45,18 +45,18 @@ func (controller *UserController) GetUserByID(ctx *gin.Context) {
 	userResponse, errResponse := controller.userService.Get(stringID)
 	if errResponse != nil {
 		utils.ErrorResponse(ctx, *errResponse)
-	} else {
-		utils.SuccessResponse(ctx, userResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, userResponse)
 }
 
 func (controller *UserController) GetAll(ctx *gin.Context) {
 	userResponse, errResponse := controller.userService.GetAll()
 	if errResponse != nil {
 		utils.ErrorResponse(ctx, *errResponse)
-	} else {
-		utils.SuccessResponse(ctx, userResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, userResponse)
 }
 
 func (controller *UserController) GetAllUserExceptCurrent(ctx *gin.Context) {
@@ -69,9 +69,9 @@ func (controller *UserController) GetAllUserExceptCurrent(ctx *gin.Context) {
 	userResponse, errResponse := controller.userService.GetAllUserExceptCurrent(*stringID)
 	if errResponse != nil {
 		utils.ErrorResponse(ctx, *errResponse)
-	} else {
-		utils.SuccessResponse(ctx, userResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, userResponse)
 }
 
 func (controller *UserController) Create(ctx *gin.Context) {
@@ -88,9 +88,9 @@ func (controller *UserController) Create(ctx *gin.Context) {
 
 	if err := controller.userService.Create(payload); err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *UserController) Update(ctx *gin.Context) {
@@ -107,20 +107,19 @@ func (controller *UserController) Update(ctx *gin.Context) {
 
 	if err := controller.userService.Update(payload); err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *UserController) Delete(ctx *gin.Context) {
 	stringId := ctx.Param("id")
 
-	err := controller.userService.Delete(stringId)
-	if err != nil {
+	if err := controller.userService.Delete(stringId); err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *UserController) MultipleDelete(ctx *gin.Context) {
@@ -137,9 +136,9 @@ func (controller *UserController) MultipleDelete(ctx *gin.Context) {
 
 	if err := controller.userService.MultipleDelete(payload.IDs); err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *UserController) UpdateEmail(ctx *gin.Context) {
@@ -162,9 +161,9 @@ func (controller *UserController) UpdateEmail(ctx *gin.Context) {
 
 	if err := controller.userService.UpdateEmail(*stringID, payload); err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *UserController) UpdateBiodata(ctx *gin.Context) {
@@ -187,9 +186,9 @@ func (controller *UserController) UpdateBiodata(ctx *gin.Context) {
 
 	if err := controller.userService.UpdateBiodata(*stringID, payload); err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *UserController) UpdateRole(ctx *gin.Context) {
@@ -206,9 +205,9 @@ func (controller *UserController) UpdateRole(ctx *gin.Context) {
 
 	if err := controller.userService.UpdateRole(payload); err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *UserController) UpdatePassword(ctx *gin.Context) {
@@ -225,9 +224,9 @@ func (controller *UserController) UpdatePassword(ctx *gin.Context) {
 
 	if err := controller.userService.UpdatePassword(payload); err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *UserController) UpdateAccess(ctx *gin.Context) {
@@ -244,9 +243,9 @@ func (controller *UserController) UpdateAccess(ctx *gin.Context) {
 
 	if err := controller.userService.UpdateAccess(payload); err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *UserController) PreviewImport(ctx *gin.Context) {
@@ -276,9 +275,9 @@ func (controller *UserController) PreviewImport(ctx *gin.Context) {
 	previewResponse, errResponse := controller.userService.PreviewImport(file, columnMappingJSON)
 	if errResponse != nil {
 		utils.ErrorResponse(ctx, *errResponse)
-	} else {
-		utils.SuccessResponse(ctx, previewResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, previewResponse)
 }
 
 func (controller *UserController) UnlockUser(ctx *gin.Context) {
@@ -290,9 +289,9 @@ func (controller *UserController) UnlockUser(ctx *gin.Context) {
 
 	if err := controller.userService.UnlockUser(userId); err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *UserController) BulkImport(ctx *gin.Context) {
@@ -310,7 +309,7 @@ func (controller *UserController) BulkImport(ctx *gin.Context) {
 	importResponse, errResponse := controller.userService.BulkImport(payload)
 	if errResponse != nil {
 		utils.ErrorResponse(ctx, *errResponse)
-	} else {
-		utils.SuccessResponse(ctx, importResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, importResponse)
 }

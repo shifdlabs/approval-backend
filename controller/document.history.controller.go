@@ -21,12 +21,11 @@ func (controller *DocumentHistoryController) Get(ctx *gin.Context) {
 	stringId := ctx.Param("id")
 
 	documentHistoryResponse, errDocumentHistoryResponse := controller.documentHistoryService.Get(stringId)
-
 	if errDocumentHistoryResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentHistoryResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentHistoryResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, documentHistoryResponse)
 }
 
 func (controller *DocumentHistoryController) GetAll(ctx *gin.Context) {
@@ -37,31 +36,25 @@ func (controller *DocumentHistoryController) GetAll(ctx *gin.Context) {
 	}
 
 	documentHistoryResponse, errDocumentHistoryResponse := controller.documentHistoryService.GetAll()
-
 	if errDocumentHistoryResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentHistoryResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentHistoryResponse)
-
-		utils.SetCache(ctx, "All History", documentHistoryResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, documentHistoryResponse)
+	utils.SetCache(ctx, "All History", documentHistoryResponse)
 }
 
 func (controller *DocumentHistoryController) GetRejectedWithDocumentAndUser(ctx *gin.Context) {
-	// Ambil userID dari context
 	id, errParse := helper.GetUserId(ctx)
 	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
+		return
 	}
 
-	// Panggil service untuk mendapatkan data
 	documentHistoryResponse, err := controller.documentHistoryService.FetchHistoriesByUserID(*id)
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
-
-	// Kirimkan response sukses
 	utils.SuccessResponse(ctx, documentHistoryResponse)
 }

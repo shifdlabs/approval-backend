@@ -5,8 +5,6 @@ import (
 	"Microservice/helper/enums"
 	"Microservice/model"
 	"Microservice/utils"
-	"fmt"
-	"time"
 
 	request "Microservice/data/request/Position"
 	service "Microservice/service/Position"
@@ -28,34 +26,26 @@ func (controller *PositionController) Get(ctx *gin.Context) {
 	stringID := ctx.Param("id")
 
 	positionResponse, err := controller.positionService.Get(stringID)
-
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, positionResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, positionResponse)
 }
 
 func (controller *PositionController) GetAll(ctx *gin.Context) {
-	startTime := time.Now()
 	positionResponse, err := controller.positionService.GetAll()
-
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, positionResponse)
+		return
 	}
-	duration := time.Since(startTime)
-	fmt.Printf("GetAll took %s\n", duration)
+	utils.SuccessResponse(ctx, positionResponse)
 }
 
 func (controller *PositionController) Create(ctx *gin.Context) {
 	var payload request.CreatePositionRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
@@ -70,7 +60,6 @@ func (controller *PositionController) Create(ctx *gin.Context) {
 		return
 	}
 
-	// Action Log
 	controller.userLogService.CreateLog(
 		model.UserLog{
 			UserID: *helper.GetUserUUID(ctx),
@@ -85,11 +74,8 @@ func (controller *PositionController) Create(ctx *gin.Context) {
 
 func (controller *PositionController) Update(ctx *gin.Context) {
 	var payload request.UpdatePositionRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
@@ -104,7 +90,6 @@ func (controller *PositionController) Update(ctx *gin.Context) {
 		return
 	}
 
-	// Action Log
 	controller.userLogService.CreateLog(
 		model.UserLog{
 			UserID: *helper.GetUserUUID(ctx),
@@ -120,8 +105,11 @@ func (controller *PositionController) Update(ctx *gin.Context) {
 func (controller *PositionController) Delete(ctx *gin.Context) {
 	stringID := ctx.Param("id")
 	errResponse := controller.positionService.Delete(stringID)
+	if errResponse != nil {
+		utils.ErrorResponse(ctx, *errResponse)
+		return
+	}
 
-	// Action Log
 	controller.userLogService.CreateLog(
 		model.UserLog{
 			UserID: *helper.GetUserUUID(ctx),
@@ -130,9 +118,5 @@ func (controller *PositionController) Delete(ctx *gin.Context) {
 		},
 	)
 
-	if errResponse != nil {
-		utils.ErrorResponse(ctx, *errResponse)
-	} else {
-		utils.SuccessResponse(ctx, nil)
-	}
+	utils.SuccessResponse(ctx, nil)
 }

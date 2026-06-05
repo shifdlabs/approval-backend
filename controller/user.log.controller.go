@@ -17,10 +17,9 @@ func NewUserLogController(service service.UserLogService) *UserLogController {
 
 func (controller *UserLogController) GetAll(ctx *gin.Context) {
 	userLogResponse, errUserLogResponse := controller.userLogService.GetAll()
-
 	if errUserLogResponse != nil {
 		utils.ErrorResponse(ctx, *errUserLogResponse)
-	} else {
-		utils.SuccessResponse(ctx, userLogResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, userLogResponse)
 }

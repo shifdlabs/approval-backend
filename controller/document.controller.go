@@ -30,9 +30,9 @@ func (controller *DocumentController) Get(ctx *gin.Context) {
 	documentResponse, errDocumentResponse := controller.documentService.GetDocument(stringId)
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, documentResponse)
 }
 
 func (controller *DocumentController) GetDetailPreview(ctx *gin.Context) {
@@ -47,9 +47,9 @@ func (controller *DocumentController) GetDetailPreview(ctx *gin.Context) {
 	documentResponse, errDocumentResponse := controller.documentService.GetDetailDocument(stringId, *id)
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, documentResponse)
 }
 
 func (controller *DocumentController) GetDetailForEdit(ctx *gin.Context) {
@@ -58,19 +58,19 @@ func (controller *DocumentController) GetDetailForEdit(ctx *gin.Context) {
 	documentResponse, errDocumentResponse := controller.documentService.GetDetailForEdit(stringId)
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, documentResponse)
 }
 
 func (controller *DocumentController) GetAll(ctx *gin.Context) {
 	documentResponse, errDocumentResponse := controller.documentService.GetAllDocument()
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentResponse)
-		utils.SetCache(ctx, "All Documents", documentResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, documentResponse)
+	utils.SetCache(ctx, "All Documents", documentResponse)
 }
 
 func (controller *DocumentController) GetAllReferences(ctx *gin.Context) {
@@ -78,10 +78,10 @@ func (controller *DocumentController) GetAllReferences(ctx *gin.Context) {
 	documentResponse, errDocumentResponse := controller.documentService.GetAllReferences(querySubject)
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentResponse)
-		utils.SetCache(ctx, "All Reference Documents", documentResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, documentResponse)
+	utils.SetCache(ctx, "All Reference Documents", documentResponse)
 }
 
 func (controller *DocumentController) GetAllAuthorization(ctx *gin.Context) {
@@ -94,10 +94,10 @@ func (controller *DocumentController) GetAllAuthorization(ctx *gin.Context) {
 	documentResponse, errDocumentResponse := controller.documentService.GetAllAuthorization(*id)
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentResponse)
-		utils.SetCache(ctx, "All Documents", documentResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, documentResponse)
+	utils.SetCache(ctx, "All Documents", documentResponse)
 }
 
 func (controller *DocumentController) GetAllInProgress(ctx *gin.Context) {
@@ -110,10 +110,10 @@ func (controller *DocumentController) GetAllInProgress(ctx *gin.Context) {
 	documentResponse, errDocumentResponse := controller.documentService.GetAllInProgress(*id)
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentResponse)
-		utils.SetCache(ctx, "All Documents", documentResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, documentResponse)
+	utils.SetCache(ctx, "All Documents", documentResponse)
 }
 
 func (controller *DocumentController) GetAllRejected(ctx *gin.Context) {
@@ -126,10 +126,10 @@ func (controller *DocumentController) GetAllRejected(ctx *gin.Context) {
 	documentResponse, errDocumentResponse := controller.documentService.GetRejectedByAuthorID(*id)
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentResponse)
-		utils.SetCache(ctx, "All Documents", documentResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, documentResponse)
+	utils.SetCache(ctx, "All Documents", documentResponse)
 }
 
 func (controller *DocumentController) Create(ctx *gin.Context) {
@@ -277,9 +277,9 @@ func (controller *DocumentController) Authorize(ctx *gin.Context) {
 
 	if err := controller.documentService.Authorize(payload, *userId); err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *DocumentController) GetComplete(ctx *gin.Context) {
@@ -292,9 +292,9 @@ func (controller *DocumentController) GetComplete(ctx *gin.Context) {
 	documentResponses, err := controller.documentService.GetCompleteByAuthorID(*id)
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, documentResponses)
+		return
 	}
+	utils.SuccessResponse(ctx, documentResponses)
 }
 
 func (controller *DocumentController) GetDraft(ctx *gin.Context) {
@@ -307,9 +307,9 @@ func (controller *DocumentController) GetDraft(ctx *gin.Context) {
 	documentResponses, err := controller.documentService.GetDraftByAuthorID(*id)
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, documentResponses)
+		return
 	}
+	utils.SuccessResponse(ctx, documentResponses)
 }
 
 func (controller *DocumentController) GetAllInbox(ctx *gin.Context) {
@@ -322,9 +322,9 @@ func (controller *DocumentController) GetAllInbox(ctx *gin.Context) {
 	documentResponses, err := controller.documentService.GetAllInbox(*id)
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, documentResponses)
+		return
 	}
+	utils.SuccessResponse(ctx, documentResponses)
 }
 
 func (controller *DocumentController) GetDashboardSummary(ctx *gin.Context) {

@@ -26,12 +26,11 @@ func (controller *DocumentAttachmentController) Get(ctx *gin.Context) {
 	stringId := ctx.Param("id")
 
 	documentAttachmentResponse, errDocumentAttachmentResponse := controller.documentAttachmentService.Get(stringId)
-
 	if errDocumentAttachmentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentAttachmentResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentAttachmentResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, documentAttachmentResponse)
 }
 
 func (controller *DocumentAttachmentController) GetAll(ctx *gin.Context) {
@@ -42,23 +41,18 @@ func (controller *DocumentAttachmentController) GetAll(ctx *gin.Context) {
 	}
 
 	documentAttachmentResponse, errDocumentAttachmentResponse := controller.documentAttachmentService.GetAll()
-
 	if errDocumentAttachmentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentAttachmentResponse)
-	} else {
-		utils.SuccessResponse(ctx, documentAttachmentResponse)
-
-		utils.SetCache(ctx, "All Attachment", documentAttachmentResponse)
+		return
 	}
+	utils.SuccessResponse(ctx, documentAttachmentResponse)
+	utils.SetCache(ctx, "All Attachment", documentAttachmentResponse)
 }
 
 func (controller *DocumentAttachmentController) Delete(ctx *gin.Context) {
 	var payload request.AttachmentRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
@@ -68,19 +62,19 @@ func (controller *DocumentAttachmentController) Delete(ctx *gin.Context) {
 	}
 
 	errDocumentAttachmentResponse := controller.documentAttachmentService.Delete(payload.Id)
-
 	if errDocumentAttachmentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentAttachmentResponse)
-	} else {
-		controller.userLogService.CreateLog(
-			model.UserLog{
-				UserID: *helper.GetUserUUID(ctx),
-				Action: string(enums.Delete),
-				Module: string(enums.DocumentAttachment),
-				Log:    helper.ToJSON(payload),
-			},
-		)
-
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+
+	controller.userLogService.CreateLog(
+		model.UserLog{
+			UserID: *helper.GetUserUUID(ctx),
+			Action: string(enums.Delete),
+			Module: string(enums.DocumentAttachment),
+			Log:    helper.ToJSON(payload),
+		},
+	)
+
+	utils.SuccessResponse(ctx, nil)
 }

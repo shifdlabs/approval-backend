@@ -20,11 +20,8 @@ func NewRecipientController(service service.RecipientService) *RecipientControll
 
 func (controller *RecipientController) Create(ctx *gin.Context) {
 	var payload request.RecipientRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
@@ -34,20 +31,17 @@ func (controller *RecipientController) Create(ctx *gin.Context) {
 	}
 
 	err := controller.recipientService.Create(payload)
-
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *RecipientController) Update(ctx *gin.Context) {
 	var payload request.RecipientRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
@@ -59,7 +53,7 @@ func (controller *RecipientController) Update(ctx *gin.Context) {
 	err := controller.recipientService.Update(payload)
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }

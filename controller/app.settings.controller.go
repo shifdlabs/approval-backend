@@ -3,8 +3,6 @@ package controller
 import (
 	"Microservice/helper"
 	"Microservice/utils"
-	"fmt"
-	"time"
 
 	request "Microservice/data/request/AppSettings"
 	service "Microservice/service/AppSettings"
@@ -21,25 +19,18 @@ func NewAppSettingsController(service service.AppSettingService) *AppSettingsCon
 }
 
 func (controller *AppSettingsController) GetAll(ctx *gin.Context) {
-	startTime := time.Now()
 	appSettingsResponse, err := controller.appSettingsService.GetAll()
-
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, appSettingsResponse)
+		return
 	}
-	duration := time.Since(startTime)
-	fmt.Printf("GetAll took %s\n", duration)
+	utils.SuccessResponse(ctx, appSettingsResponse)
 }
 
 func (controller *AppSettingsController) Update(ctx *gin.Context) {
 	var payload request.AppSettingRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
@@ -49,10 +40,9 @@ func (controller *AppSettingsController) Update(ctx *gin.Context) {
 	}
 
 	err := controller.appSettingsService.Update(payload)
-
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }

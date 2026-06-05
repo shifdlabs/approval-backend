@@ -20,11 +20,8 @@ func NewCarbonCopyController(service service.CarbonCopyService) *CarbonCopyContr
 
 func (controller *CarbonCopyController) Create(ctx *gin.Context) {
 	var payload request.CarbonCopyRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
@@ -34,20 +31,17 @@ func (controller *CarbonCopyController) Create(ctx *gin.Context) {
 	}
 
 	err := controller.carbonCopyService.Create(payload)
-
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *CarbonCopyController) Update(ctx *gin.Context) {
 	var payload request.CarbonCopyRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
@@ -59,7 +53,7 @@ func (controller *CarbonCopyController) Update(ctx *gin.Context) {
 	err := controller.carbonCopyService.Update(payload)
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
+		return
 	}
+	utils.SuccessResponse(ctx, nil)
 }
