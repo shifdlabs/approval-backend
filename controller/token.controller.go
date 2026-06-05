@@ -43,6 +43,11 @@ func (controller *TokenController) RefreshAccessToken(ctx *gin.Context) {
 		return
 	}
 
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
+
 	helper.PrintValue(payload.RefreshToken, "Payload Refresh Token")
 
 	newAccessToken, newRefreshToken, err := helper.ValidateOrRefreshAccess(accessToken, payload.RefreshToken)

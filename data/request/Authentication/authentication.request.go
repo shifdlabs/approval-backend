@@ -8,12 +8,12 @@ import (
 )
 
 type VerifyForgetPassword struct {
-	Email string `json:"email" validate:"required"`
+	Email string `json:"email" validate:"required,email"`
 }
 
 type ResetPassword struct {
-	Email       string `json:"email" validate:"required"`
-	NewPassword string `json:"newPassword" validate:"required"`
+	Email       string `json:"email" validate:"required,email"`
+	NewPassword string `json:"newPassword" validate:"required,min=8,max=200"`
 }
 
 type UserResponse struct {

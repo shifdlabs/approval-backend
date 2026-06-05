@@ -29,6 +29,11 @@ func (controller *BookmarkController) AddBookmarkHandler(ctx *gin.Context) {
 		return
 	}
 
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
+
 	err := controller.bookmarkService.AddBookmark(payload)
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
@@ -48,6 +53,11 @@ func (controller *BookmarkController) RemoveBookmarkHandler(ctx *gin.Context) {
 		return
 	}
 
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
+
 	err := controller.bookmarkService.RemoveBookmark(payload)
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
@@ -64,6 +74,11 @@ func (controller *BookmarkController) IsBookmarkedHandler(ctx *gin.Context) {
 	if errBindJSON != nil {
 		msg := "Bad Request"
 		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		return
+	}
+
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 

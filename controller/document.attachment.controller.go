@@ -62,6 +62,11 @@ func (controller *DocumentAttachmentController) Delete(ctx *gin.Context) {
 		return
 	}
 
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
+
 	errDocumentAttachmentResponse := controller.documentAttachmentService.Delete(payload.Id)
 
 	if errDocumentAttachmentResponse != nil {

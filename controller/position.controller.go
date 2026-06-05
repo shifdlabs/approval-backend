@@ -65,9 +65,10 @@ func (controller *PositionController) Create(ctx *gin.Context) {
 	}
 
 	err := controller.positionService.Create(payload)
-
-	res := *helper.GetUserUUID(ctx)
-	fmt.Println("ID: ", res)
+	if err != nil {
+		utils.ErrorResponse(ctx, *err)
+		return
+	}
 
 	// Action Log
 	controller.userLogService.CreateLog(
@@ -79,11 +80,7 @@ func (controller *PositionController) Create(ctx *gin.Context) {
 		},
 	)
 
-	if err != nil {
-		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
-	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *PositionController) Update(ctx *gin.Context) {
@@ -96,7 +93,16 @@ func (controller *PositionController) Update(ctx *gin.Context) {
 		return
 	}
 
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
+
 	err := controller.positionService.Update(payload)
+	if err != nil {
+		utils.ErrorResponse(ctx, *err)
+		return
+	}
 
 	// Action Log
 	controller.userLogService.CreateLog(
@@ -108,11 +114,7 @@ func (controller *PositionController) Update(ctx *gin.Context) {
 		},
 	)
 
-	if err != nil {
-		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
-	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *PositionController) Delete(ctx *gin.Context) {

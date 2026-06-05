@@ -43,6 +43,11 @@ func (controller *AppSettingsController) Update(ctx *gin.Context) {
 		return
 	}
 
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
+
 	err := controller.appSettingsService.Update(payload)
 
 	if err != nil {
