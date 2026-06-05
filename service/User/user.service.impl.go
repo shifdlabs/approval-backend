@@ -3,6 +3,8 @@ package user
 import (
 	"Microservice/helper"
 	"Microservice/model"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"mime/multipart"
@@ -47,7 +49,7 @@ func (t UserServiceImpl) Create(request request.CreateUserRequest) *helper.Error
 	errStructure := t.Validate.Struct(request)
 	if errStructure != nil {
 		msg := "Structure Error"
-		return helper.ErrorCatcher(errStructure, 500, &msg)
+		return helper.ErrorCatcher(errStructure, 400, &msg)
 	}
 
 	if request.PositionID != "" {
@@ -62,7 +64,7 @@ func (t UserServiceImpl) Create(request request.CreateUserRequest) *helper.Error
 	hashedPassword, errBcrypt := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
 	if errBcrypt != nil {
 		msg := "Failed to encrypt password"
-		return helper.ErrorCatcher(errStructure, 500, &msg)
+		return helper.ErrorCatcher(errBcrypt, 500, &msg)
 	}
 
 	newUser := model.User{
@@ -133,7 +135,7 @@ func (t UserServiceImpl) Update(request request.UpdateUserRequest) *helper.Error
 	errStructure := t.Validate.Struct(request)
 	if errStructure != nil {
 		msg := "Structure Error"
-		return helper.ErrorCatcher(errStructure, 500, &msg)
+		return helper.ErrorCatcher(errStructure, 400, &msg)
 	}
 
 	if request.PositionID != "" {
@@ -510,7 +512,7 @@ func (t UserServiceImpl) BulkImport(importRequest request.BulkImportUsersRequest
 	errStructure := t.Validate.Struct(importRequest)
 	if errStructure != nil {
 		msg := "Structure Error"
-		return nil, helper.ErrorCatcher(errStructure, 500, &msg)
+		return nil, helper.ErrorCatcher(errStructure, 400, &msg)
 	}
 
 	var successCount, failedCount int
@@ -571,7 +573,7 @@ func (t UserServiceImpl) BulkImport(importRequest request.BulkImportUsersRequest
 		if importRequest.CustomPassword != "" {
 			password = importRequest.CustomPassword
 		} else if password == "" {
-			password = "password123"
+			password = generateRandomPassword()
 		}
 
 		role := userData.Role
@@ -649,4 +651,13 @@ func (t UserServiceImpl) UnlockUser(userId string) *helper.ErrorModel {
 	}
 
 	return nil
+}
+
+// generateRandomPassword generates a cryptographically secure random password.
+func generateRandomPassword() string {
+	b := make([]byte, 18)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("tmp%d", 0)
+	}
+	return base64.URLEncoding.EncodeToString(b)[:24]
 }

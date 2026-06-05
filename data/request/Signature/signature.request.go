@@ -1,10 +1,10 @@
 package signature
 
 type CreateSignatureRequest struct {
-	UserID   string `validate:"required" json:"userId"`
-	ImageURL string `validate:"required" json:"imageUrl"`
+	UserID   string `validate:"required,uuid" json:"userId"`
+	ImageURL string `validate:"required,url" json:"imageUrl"`
 }
 
 type UpdateSignatureRequest struct {
-	ImageURL string `validate:"required" json:"imageUrl"`
+	ImageURL string `validate:"required,url" json:"imageUrl"`
 }

@@ -10,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const maxUploadSize = 10 * 1024 * 1024 // 10 MB
+
 type UserController struct {
 	userService service.UserService
 }
@@ -19,15 +21,13 @@ func NewUserController(service service.UserService) *UserController {
 }
 
 func (controller *UserController) Get(ctx *gin.Context) {
-	// GET USER ID
 	stringID, errorParseToken := helper.GetUserId(ctx)
 	if errorParseToken != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
 	userResponse, errResponse := controller.userService.Get(*stringID)
-
 	if errResponse != nil {
 		utils.ErrorResponse(ctx, *errResponse)
 	} else {
@@ -36,15 +36,13 @@ func (controller *UserController) Get(ctx *gin.Context) {
 }
 
 func (controller *UserController) GetUserByID(ctx *gin.Context) {
-	// GET USER ID
 	stringID := ctx.Param("id")
 	if stringID == "" {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
 	userResponse, errResponse := controller.userService.Get(stringID)
-
 	if errResponse != nil {
 		utils.ErrorResponse(ctx, *errResponse)
 	} else {
@@ -54,7 +52,6 @@ func (controller *UserController) GetUserByID(ctx *gin.Context) {
 
 func (controller *UserController) GetAll(ctx *gin.Context) {
 	userResponse, errResponse := controller.userService.GetAll()
-
 	if errResponse != nil {
 		utils.ErrorResponse(ctx, *errResponse)
 	} else {
@@ -65,12 +62,11 @@ func (controller *UserController) GetAll(ctx *gin.Context) {
 func (controller *UserController) GetAllUserExceptCurrent(ctx *gin.Context) {
 	stringID, errorParseToken := helper.GetUserId(ctx)
 	if errorParseToken != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
 	userResponse, errResponse := controller.userService.GetAllUserExceptCurrent(*stringID)
-
 	if errResponse != nil {
 		utils.ErrorResponse(ctx, *errResponse)
 	} else {
@@ -80,16 +76,18 @@ func (controller *UserController) GetAllUserExceptCurrent(ctx *gin.Context) {
 
 func (controller *UserController) Create(ctx *gin.Context) {
 	var payload request.CreateUserRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
-	errCreateUser := controller.userService.Create(payload)
-	if errCreateUser != nil {
-		utils.ErrorResponse(ctx, *errCreateUser)
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
+
+	if err := controller.userService.Create(payload); err != nil {
+		utils.ErrorResponse(ctx, *err)
 	} else {
 		utils.SuccessResponse(ctx, nil)
 	}
@@ -97,16 +95,18 @@ func (controller *UserController) Create(ctx *gin.Context) {
 
 func (controller *UserController) Update(ctx *gin.Context) {
 	var payload request.UpdateUserRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
-	errCreateUser := controller.userService.Update(payload)
-	if errCreateUser != nil {
-		utils.ErrorResponse(ctx, *errCreateUser)
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
+
+	if err := controller.userService.Update(payload); err != nil {
+		utils.ErrorResponse(ctx, *err)
 	} else {
 		utils.SuccessResponse(ctx, nil)
 	}
@@ -116,7 +116,6 @@ func (controller *UserController) Delete(ctx *gin.Context) {
 	stringId := ctx.Param("id")
 
 	err := controller.userService.Delete(stringId)
-
 	if err != nil {
 		utils.ErrorResponse(ctx, *err)
 	} else {
@@ -126,16 +125,17 @@ func (controller *UserController) Delete(ctx *gin.Context) {
 
 func (controller *UserController) MultipleDelete(ctx *gin.Context) {
 	var payload request.DeleteMultipleUserRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
-	err := controller.userService.MultipleDelete(payload.IDs)
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
 
-	if err != nil {
+	if err := controller.userService.MultipleDelete(payload.IDs); err != nil {
 		utils.ErrorResponse(ctx, *err)
 	} else {
 		utils.SuccessResponse(ctx, nil)
@@ -143,46 +143,50 @@ func (controller *UserController) MultipleDelete(ctx *gin.Context) {
 }
 
 func (controller *UserController) UpdateEmail(ctx *gin.Context) {
-	var payload request.UpdateEmailRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
 	stringID, errorParseToken := helper.GetUserId(ctx)
 	if errorParseToken != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	var payload request.UpdateEmailRequest
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
-	errCreateUser := controller.userService.UpdateEmail(*stringID, payload)
-	if errCreateUser != nil {
-		utils.ErrorResponse(ctx, *errCreateUser)
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
+
+	if err := controller.userService.UpdateEmail(*stringID, payload); err != nil {
+		utils.ErrorResponse(ctx, *err)
 	} else {
 		utils.SuccessResponse(ctx, nil)
 	}
 }
 
 func (controller *UserController) UpdateBiodata(ctx *gin.Context) {
-	var payload request.UpdateBiodataRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
 	stringID, errorParseToken := helper.GetUserId(ctx)
 	if errorParseToken != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	var payload request.UpdateBiodataRequest
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
-	errCreateUser := controller.userService.UpdateBiodata(*stringID, payload)
-	if errCreateUser != nil {
-		utils.ErrorResponse(ctx, *errCreateUser)
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
+
+	if err := controller.userService.UpdateBiodata(*stringID, payload); err != nil {
+		utils.ErrorResponse(ctx, *err)
 	} else {
 		utils.SuccessResponse(ctx, nil)
 	}
@@ -190,16 +194,18 @@ func (controller *UserController) UpdateBiodata(ctx *gin.Context) {
 
 func (controller *UserController) UpdateRole(ctx *gin.Context) {
 	var payload request.UpdateRoleRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
-	errCreateUser := controller.userService.UpdateRole(payload)
-	if errCreateUser != nil {
-		utils.ErrorResponse(ctx, *errCreateUser)
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
+
+	if err := controller.userService.UpdateRole(payload); err != nil {
+		utils.ErrorResponse(ctx, *err)
 	} else {
 		utils.SuccessResponse(ctx, nil)
 	}
@@ -207,16 +213,18 @@ func (controller *UserController) UpdateRole(ctx *gin.Context) {
 
 func (controller *UserController) UpdatePassword(ctx *gin.Context) {
 	var payload request.UpdatePasswordRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
-	errCreateUser := controller.userService.UpdatePassword(payload)
-	if errCreateUser != nil {
-		utils.ErrorResponse(ctx, *errCreateUser)
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
+
+	if err := controller.userService.UpdatePassword(payload); err != nil {
+		utils.ErrorResponse(ctx, *err)
 	} else {
 		utils.SuccessResponse(ctx, nil)
 	}
@@ -224,16 +232,18 @@ func (controller *UserController) UpdatePassword(ctx *gin.Context) {
 
 func (controller *UserController) UpdateAccess(ctx *gin.Context) {
 	var payload request.UpdateAccessRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
-	errCreateUser := controller.userService.UpdateAccess(payload)
-	if errCreateUser != nil {
-		utils.ErrorResponse(ctx, *errCreateUser)
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
+
+	if err := controller.userService.UpdateAccess(payload); err != nil {
+		utils.ErrorResponse(ctx, *err)
 	} else {
 		utils.SuccessResponse(ctx, nil)
 	}
@@ -242,23 +252,24 @@ func (controller *UserController) UpdateAccess(ctx *gin.Context) {
 func (controller *UserController) PreviewImport(ctx *gin.Context) {
 	file, err := ctx.FormFile("file")
 	if err != nil {
-		msg := "File is required"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "File is required"})
+		return
+	}
+
+	if file.Size > maxUploadSize {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "File size must not exceed 10 MB"})
+		return
+	}
+
+	if !strings.HasSuffix(strings.ToLower(file.Filename), ".xlsx") &&
+		!strings.HasSuffix(strings.ToLower(file.Filename), ".xls") {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Only Excel files (.xlsx, .xls) are allowed"})
 		return
 	}
 
 	columnMappingJSON := ctx.PostForm("columnMapping")
 	if columnMappingJSON == "" {
-		msg := "Column mapping is required"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
-		return
-	}
-
-	// Validate file extension
-	if !strings.HasSuffix(strings.ToLower(file.Filename), ".xlsx") &&
-		!strings.HasSuffix(strings.ToLower(file.Filename), ".xls") {
-		msg := "Only Excel files (.xlsx, .xls) are allowed"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Column mapping is required"})
 		return
 	}
 
@@ -272,16 +283,13 @@ func (controller *UserController) PreviewImport(ctx *gin.Context) {
 
 func (controller *UserController) UnlockUser(ctx *gin.Context) {
 	userId := ctx.Param("userId")
-
 	if userId == "" {
-		msg := "User ID is required"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "User ID is required"})
 		return
 	}
 
-	errUnlock := controller.userService.UnlockUser(userId)
-	if errUnlock != nil {
-		utils.ErrorResponse(ctx, *errUnlock)
+	if err := controller.userService.UnlockUser(userId); err != nil {
+		utils.ErrorResponse(ctx, *err)
 	} else {
 		utils.SuccessResponse(ctx, nil)
 	}
@@ -289,11 +297,13 @@ func (controller *UserController) UnlockUser(ctx *gin.Context) {
 
 func (controller *UserController) BulkImport(ctx *gin.Context) {
 	var payload request.BulkImportUsersRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
 
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 

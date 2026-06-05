@@ -24,22 +24,24 @@ func NewDocumentNumbersController(service service.DocumentNumbersService, userLo
 
 func (controller *DocumentNumbersController) Create(ctx *gin.Context) {
 	var payload request.DocumentNumbersRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
+	}
 
-	if errBindJSON != nil {
-		msg := "Bad Request"
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
 	id, errParse := helper.GetUserId(ctx)
 	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
+		return
 	}
 
 	err := controller.documentNumbersService.Create(payload, *id, nil, enums.Booked)
 
-	// Action Log
 	controller.userLogService.CreateLog(
 		model.UserLog{
 			UserID: *helper.GetUserUUID(ctx),
@@ -57,9 +59,7 @@ func (controller *DocumentNumbersController) Create(ctx *gin.Context) {
 }
 
 func (controller *DocumentNumbersController) GetAll(ctx *gin.Context) {
-
 	documentNumbers, errDocumentNumbersResponse := controller.documentNumbersService.GetAll()
-
 	if errDocumentNumbersResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentNumbersResponse)
 	} else {
@@ -70,12 +70,11 @@ func (controller *DocumentNumbersController) GetAll(ctx *gin.Context) {
 func (controller *DocumentNumbersController) GetAllByUserId(ctx *gin.Context) {
 	id, errParse := helper.GetUserId(ctx)
 	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
+		return
 	}
 
 	documentNumbers, errDocumentNumbersResponse := controller.documentNumbersService.GetAllByUserId(*id)
-
 	if errDocumentNumbersResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentNumbersResponse)
 	} else {
@@ -86,7 +85,7 @@ func (controller *DocumentNumbersController) GetAllByUserId(ctx *gin.Context) {
 func (controller *DocumentNumbersController) Delete(ctx *gin.Context) {
 	stringID := ctx.Param("id")
 	errResponse := controller.documentNumbersService.Delete(stringID)
-	// Action Log
+
 	controller.userLogService.CreateLog(
 		model.UserLog{
 			UserID: *helper.GetUserUUID(ctx),

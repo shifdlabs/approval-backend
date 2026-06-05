@@ -30,7 +30,7 @@ type User struct {
 	DeletedAt  *time.Time
 }
 
-func (u *User) DecryptingPassword() error {
+func (u *User) HashPassword() error {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
@@ -43,13 +43,13 @@ func (u *User) DecryptingPassword() error {
 	return nil
 }
 
-func ManualDecryptPassword(password string) (*string, error) {
+func HashPasswordString(password string) (*string, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
 
-	decryptedPassword := string(hashedPassword)
+	hashed := string(hashedPassword)
 
-	return &decryptedPassword, nil
+	return &hashed, nil
 }

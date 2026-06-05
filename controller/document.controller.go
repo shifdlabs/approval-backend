@@ -28,7 +28,6 @@ func (controller *DocumentController) Get(ctx *gin.Context) {
 	stringId := ctx.Param("id")
 
 	documentResponse, errDocumentResponse := controller.documentService.GetDocument(stringId)
-
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
 	} else {
@@ -41,13 +40,11 @@ func (controller *DocumentController) GetDetailPreview(ctx *gin.Context) {
 
 	id, errParse := helper.GetUserId(ctx)
 	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
 		return
 	}
 
 	documentResponse, errDocumentResponse := controller.documentService.GetDetailDocument(stringId, *id)
-
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
 	} else {
@@ -59,7 +56,6 @@ func (controller *DocumentController) GetDetailForEdit(ctx *gin.Context) {
 	stringId := ctx.Param("id")
 
 	documentResponse, errDocumentResponse := controller.documentService.GetDetailForEdit(stringId)
-
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
 	} else {
@@ -68,19 +64,11 @@ func (controller *DocumentController) GetDetailForEdit(ctx *gin.Context) {
 }
 
 func (controller *DocumentController) GetAll(ctx *gin.Context) {
-	// cacheData := utils.GetCache(ctx, "All Documents", &[]document.DocumentResponse{})
-	// if cacheData != nil {
-	// 	utils.SuccessResponse(ctx, cacheData)
-	// 	return
-	// }
-
 	documentResponse, errDocumentResponse := controller.documentService.GetAllDocument()
-
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
 	} else {
 		utils.SuccessResponse(ctx, documentResponse)
-
 		utils.SetCache(ctx, "All Documents", documentResponse)
 	}
 }
@@ -88,12 +76,10 @@ func (controller *DocumentController) GetAll(ctx *gin.Context) {
 func (controller *DocumentController) GetAllReferences(ctx *gin.Context) {
 	querySubject := ctx.Param("q")
 	documentResponse, errDocumentResponse := controller.documentService.GetAllReferences(querySubject)
-
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
 	} else {
 		utils.SuccessResponse(ctx, documentResponse)
-
 		utils.SetCache(ctx, "All Reference Documents", documentResponse)
 	}
 }
@@ -101,18 +87,15 @@ func (controller *DocumentController) GetAllReferences(ctx *gin.Context) {
 func (controller *DocumentController) GetAllAuthorization(ctx *gin.Context) {
 	id, errParse := helper.GetUserId(ctx)
 	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
 		return
 	}
 
 	documentResponse, errDocumentResponse := controller.documentService.GetAllAuthorization(*id)
-
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
 	} else {
 		utils.SuccessResponse(ctx, documentResponse)
-
 		utils.SetCache(ctx, "All Documents", documentResponse)
 	}
 }
@@ -120,18 +103,15 @@ func (controller *DocumentController) GetAllAuthorization(ctx *gin.Context) {
 func (controller *DocumentController) GetAllInProgress(ctx *gin.Context) {
 	id, errParse := helper.GetUserId(ctx)
 	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
 		return
 	}
 
 	documentResponse, errDocumentResponse := controller.documentService.GetAllInProgress(*id)
-
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
 	} else {
 		utils.SuccessResponse(ctx, documentResponse)
-
 		utils.SetCache(ctx, "All Documents", documentResponse)
 	}
 }
@@ -139,62 +119,65 @@ func (controller *DocumentController) GetAllInProgress(ctx *gin.Context) {
 func (controller *DocumentController) GetAllRejected(ctx *gin.Context) {
 	id, errParse := helper.GetUserId(ctx)
 	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
 		return
 	}
 
 	documentResponse, errDocumentResponse := controller.documentService.GetRejectedByAuthorID(*id)
-
 	if errDocumentResponse != nil {
 		utils.ErrorResponse(ctx, *errDocumentResponse)
 	} else {
 		utils.SuccessResponse(ctx, documentResponse)
-
 		utils.SetCache(ctx, "All Documents", documentResponse)
 	}
 }
 
 func (controller *DocumentController) Create(ctx *gin.Context) {
 	var payload request.CreateDocumentRequest
-	errBindJSON := ctx.ShouldBindJSON(&payload)
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
+		return
+	}
 
-	if errBindJSON != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
 	userId, errParse := helper.GetUserId(ctx)
 	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
 		return
 	}
 
 	newDocument, err := controller.documentService.Create(payload)
+	if err != nil {
+		utils.ErrorResponse(ctx, *err)
+		return
+	}
 
 	switch payload.PublicationNumberType {
 	case 1:
-		documentNumberRequest := documentNumberRequest.DocumentNumbersRequest{NumberingFormatID: *payload.PublicationValue}
-		err := controller.documentNumberService.Create(documentNumberRequest, *userId, newDocument, enums.Saved)
-
-		if err != nil {
-			msg := "Invalid Document Number Request Structure."
-			utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		if payload.PublicationValue == nil {
+			utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "PublicationValue is required for auto-generated numbers."})
 			return
 		}
-
+		docNumReq := documentNumberRequest.DocumentNumbersRequest{NumberingFormatID: *payload.PublicationValue}
+		if err := controller.documentNumberService.Create(docNumReq, *userId, newDocument, enums.Saved); err != nil {
+			utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Document Number Request Structure."})
+			return
+		}
 	case 2:
-		errUpdate := controller.documentNumberService.Update(*payload.PublicationValue, newDocument, enums.Saved)
-		if errUpdate != nil {
-			msg := "Invalid Document Number Request Structure."
-			utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		if payload.PublicationValue == nil {
+			utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "PublicationValue is required for booking numbers."})
+			return
+		}
+		if err := controller.documentNumberService.Update(*payload.PublicationValue, newDocument, enums.Saved); err != nil {
+			utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Document Number Request Structure."})
 			return
 		}
 	}
 
-	// Action Log
 	controller.userLogService.CreateLog(
 		model.UserLog{
 			UserID: *helper.GetUserUUID(ctx),
@@ -204,64 +187,64 @@ func (controller *DocumentController) Create(ctx *gin.Context) {
 		},
 	)
 
-	if err != nil {
-		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
-	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *DocumentController) Update(ctx *gin.Context) {
-
 	var payload request.UpdateDocumentRequest
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
+		return
+	}
 
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-	if errBindJSON != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
 	userId, errParse := helper.GetUserId(ctx)
 	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
+		return
 	}
 
+	// Check err immediately before using the returned document
 	document, err := controller.documentService.Update(payload)
+	if err != nil {
+		utils.ErrorResponse(ctx, *err)
+		return
+	}
 
-	helper.PrintValue("Masuk Y", "Masuk Y")
 	isDocumentNumberStored, errDocID := controller.documentNumberService.GetByDocumentID(document.ID)
 	if errDocID != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
+		return
 	}
 
-	helper.PrintValue("Masuk X", "Masuk X")
 	if isDocumentNumberStored == nil {
-		helper.PrintValue("Masuk 1", "Masuk 1")
 		switch payload.PublicationNumberType {
 		case 1:
-			helper.PrintValue("Masuk 2", "Masuk 2")
-			documentNumberRequest := documentNumberRequest.DocumentNumbersRequest{NumberingFormatID: *payload.PublicationValue}
-			err := controller.documentNumberService.Create(documentNumberRequest, *userId, document, enums.Saved)
-
-			if err != nil {
-				msg := "Invalid Document Number Request Structure."
-				utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+			if payload.PublicationValue == nil {
+				utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "PublicationValue is required for auto-generated numbers."})
+				return
 			}
-
+			docNumReq := documentNumberRequest.DocumentNumbersRequest{NumberingFormatID: *payload.PublicationValue}
+			if err := controller.documentNumberService.Create(docNumReq, *userId, document, enums.Saved); err != nil {
+				utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Document Number Request Structure."})
+				return
+			}
 		case 2:
-			helper.PrintValue("Masuk 3", "Masuk 3")
-			errUpdate := controller.documentNumberService.Update(*payload.PublicationValue, document, enums.Saved)
-			if errUpdate != nil {
-				msg := "Invalid Document Number Request Structure."
-				utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+			if payload.PublicationValue == nil {
+				utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "PublicationValue is required for booking numbers."})
+				return
+			}
+			if err := controller.documentNumberService.Update(*payload.PublicationValue, document, enums.Saved); err != nil {
+				utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Document Number Request Structure."})
+				return
 			}
 		}
 	}
 
-	// Action Log
 	controller.userLogService.CreateLog(
 		model.UserLog{
 			UserID: *helper.GetUserUUID(ctx),
@@ -271,44 +254,28 @@ func (controller *DocumentController) Update(ctx *gin.Context) {
 		},
 	)
 
-	if err != nil {
-		utils.ErrorResponse(ctx, *err)
-	} else {
-		utils.SuccessResponse(ctx, nil)
-	}
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *DocumentController) Authorize(ctx *gin.Context) {
-
 	var payload request.Authorize
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
+		return
+	}
 
-	errBindJSON := ctx.ShouldBindJSON(&payload)
-	if errBindJSON != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
 
 	userId, errParse := helper.GetUserId(ctx)
 	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
 		return
 	}
 
-	err := controller.documentService.Authorize(payload, *userId)
-
-	// Action Log
-	// controller.userLogService.CreateLog(
-	// 	model.UserLog{
-	// 		UserID: *helper.GetUserUUID(ctx),
-	// 		Action: string(enums.Approve),
-	// 		Module: string(enums.Document),
-	// 		Log:    helper.ToJSON(payload),
-	// 	},
-	// )
-
-	if err != nil {
+	if err := controller.documentService.Authorize(payload, *userId); err != nil {
 		utils.ErrorResponse(ctx, *err)
 	} else {
 		utils.SuccessResponse(ctx, nil)
@@ -318,8 +285,7 @@ func (controller *DocumentController) Authorize(ctx *gin.Context) {
 func (controller *DocumentController) GetComplete(ctx *gin.Context) {
 	id, errParse := helper.GetUserId(ctx)
 	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
 		return
 	}
 
@@ -334,8 +300,7 @@ func (controller *DocumentController) GetComplete(ctx *gin.Context) {
 func (controller *DocumentController) GetDraft(ctx *gin.Context) {
 	id, errParse := helper.GetUserId(ctx)
 	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
 		return
 	}
 
@@ -350,8 +315,7 @@ func (controller *DocumentController) GetDraft(ctx *gin.Context) {
 func (controller *DocumentController) GetAllInbox(ctx *gin.Context) {
 	id, errParse := helper.GetUserId(ctx)
 	if errParse != nil {
-		msg := "Invalid Request Structure."
-		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
 		return
 	}
 
@@ -449,6 +413,11 @@ func (controller *DocumentController) Search(ctx *gin.Context) {
 	keyword := ctx.Query("q")
 	if keyword == "" {
 		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Keyword tidak boleh kosong."})
+		return
+	}
+
+	if len(keyword) > 100 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Keyword terlalu panjang, maksimal 100 karakter."})
 		return
 	}
 

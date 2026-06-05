@@ -40,6 +40,7 @@ func (controller *TokenController) RefreshAccessToken(ctx *gin.Context) {
 	if errBindJSON != nil {
 		msg := "Bad Request"
 		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		return
 	}
 
 	helper.PrintValue(payload.RefreshToken, "Payload Refresh Token")

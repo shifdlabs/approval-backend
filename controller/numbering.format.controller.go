@@ -30,6 +30,12 @@ func (controller *NumberingFormatController) Create(ctx *gin.Context) {
 	if errBindJSON != nil {
 		msg := "Bad Request"
 		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: msg})
+		return
+	}
+
+	if errs := helper.ValidateStruct(payload); len(errs) > 0 {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
+		return
 	}
 
 	err := controller.numberingFormatService.Create(payload)
