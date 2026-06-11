@@ -25,7 +25,7 @@ func DatabaseConnection(config *Config) *gorm.DB {
 	DB.Logger = logger.Default.LogMode(logger.Info)
 
 	log.Println("Running Migrations")
-	err = DB.AutoMigrate(&model.User{}, &model.FailedLoginAttempt{})
+	err = DB.AutoMigrate(&model.User{}, &model.FailedLoginAttempt{}, &model.PasswordResetToken{})
 	if err != nil {
 		log.Fatal("Migration Failed:  \n", err.Error())
 		os.Exit(1)

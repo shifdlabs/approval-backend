@@ -21,6 +21,7 @@ import (
 	documentReferenceRepository "Microservice/repository/DocumentReference"
 	documentSequenceRepository "Microservice/repository/DocumentSequence"
 	failedLoginAttemptRepository "Microservice/repository/FailedLoginAttempt"
+	passwordResetTokenRepository "Microservice/repository/PasswordResetToken"
 	numberingFormatRepository "Microservice/repository/NumberingFormat"
 	numberingGroupRepository "Microservice/repository/NumberingGroup"
 	positionRepository "Microservice/repository/Position"
@@ -99,6 +100,7 @@ func main() {
 	db.AutoMigrate(&model.Document{}, &model.Bookmark{})
 	db.AutoMigrate(&model.Document{}, &model.DocumentNumbers{})
 	db.AutoMigrate(&model.User{}, &model.Signature{})
+	db.AutoMigrate(&model.User{}, &model.PasswordResetToken{})
 
 	// Repositories
 	userRepository := userRepository.NewUserRepositoryImpl(db)
@@ -118,10 +120,11 @@ func main() {
 	documentReferenceRepository := documentReferenceRepository.NewDocumentReferenceRepositoryImpl(db)
 	signatureRepository := signatureRepository.NewSignatureRepositoryImpl(db)
 	failedLoginAttemptRepository := failedLoginAttemptRepository.NewFailedLoginAttemptRepositoryImpl(db)
+	passwordResetTokenRepository := passwordResetTokenRepository.NewPasswordResetTokenRepositoryImpl(db)
 
 	// Servic
 	tokenService := tokenService.NewTokenServiceImpl(userRepository)
-	authService := authService.NewAuthServiceImpl(userRepository, failedLoginAttemptRepository, validate)
+	authService := authService.NewAuthServiceImpl(userRepository, passwordResetTokenRepository, failedLoginAttemptRepository, validate, envConf)
 	userService := userService.NewUserServiceImpl(userRepository, positionRepositoy, failedLoginAttemptRepository, validate)
 	userLogService := userLogService.NewUserLogServiceImpl(userLogRepository, validate)
 	documentSequenceService := documentSequenceService.NewDocumentSequenceServiceImpl(documentSequenceRepository, validate)

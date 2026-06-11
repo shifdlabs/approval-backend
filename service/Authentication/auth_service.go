@@ -8,6 +8,6 @@ import (
 
 type AuthService interface {
 	Login(payload authentication.LogInRequest) (model.LoginResult, *helper.ErrorModel)
-	// CheckRegisteredEmail(payload authentication.VerifyForgetPassword) bool
-	// ResetPassword(payload authentication.ResetPassword) *helper.CustomError
+	ForgotPassword(email string) *helper.ErrorModel
+	ResetPassword(token, newPassword string) *helper.ErrorModel
 }

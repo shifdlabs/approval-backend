@@ -72,8 +72,8 @@ func NewRouter(
 	authRouter := router.Group("/auth")
 	authRouter.POST("/login", authController.LogIn)
 	authRouter.POST("/register", authController.Register)
-	// authRouter.POST("/forgetPassword", authController.VerifyForgetPassword)
-	// authRouter.PUT("/resetPassword", authController.ResetPassword)
+	authRouter.POST("/forgot-password", authController.ForgotPassword)
+	authRouter.POST("/reset-password", authController.ResetPassword)
 
 	token := router.Group("/refresh")
 	token.POST("", tokenController.RefreshAccessToken)

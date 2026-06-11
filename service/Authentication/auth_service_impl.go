@@ -1,30 +1,71 @@
 package authentication
 
 import (
+	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"regexp"
+	"time"
+
+	"Microservice/config"
 	model "Microservice/data/model/Authentication"
 	authentication "Microservice/data/request/Authentication"
 	"Microservice/helper"
 	dbModel "Microservice/model"
 	failedLoginAttemptRepository "Microservice/repository/FailedLoginAttempt"
+	passwordResetTokenRepository "Microservice/repository/PasswordResetToken"
 	userRepository "Microservice/repository/User"
 	"strconv"
-	"time"
 
 	"github.com/go-playground/validator/v10"
 )
 
 type AuthServiceImpl struct {
 	UserRepository               userRepository.UserRepository
+	PasswordResetTokenRepository passwordResetTokenRepository.PasswordResetTokenRepository
 	FailedLoginAttemptRepository failedLoginAttemptRepository.FailedLoginAttemptRepository
 	Validate                     *validator.Validate
+	Config                       config.Config
 }
 
-func NewAuthServiceImpl(userRepository userRepository.UserRepository, failedLoginAttemptRepository failedLoginAttemptRepository.FailedLoginAttemptRepository, validate *validator.Validate) AuthService {
+func NewAuthServiceImpl(
+	userRepository userRepository.UserRepository,
+	passwordResetTokenRepository passwordResetTokenRepository.PasswordResetTokenRepository,
+	failedLoginAttemptRepository failedLoginAttemptRepository.FailedLoginAttemptRepository,
+	validate *validator.Validate,
+	cfg config.Config,
+) AuthService {
 	return &AuthServiceImpl{
 		UserRepository:               userRepository,
+		PasswordResetTokenRepository: passwordResetTokenRepository,
 		FailedLoginAttemptRepository: failedLoginAttemptRepository,
 		Validate:                     validate,
+		Config:                       cfg,
 	}
+}
+
+func generateSecureToken() (rawToken string, tokenHash string, err error) {
+	b := make([]byte, 32)
+	if _, err = rand.Read(b); err != nil {
+		return
+	}
+	rawToken = hex.EncodeToString(b)
+	h := sha256.Sum256([]byte(rawToken))
+	tokenHash = hex.EncodeToString(h[:])
+	return
+}
+
+func hashToken(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:])
+}
+
+func isPasswordComplex(password string) bool {
+	return regexp.MustCompile(`[A-Z]`).MatchString(password) &&
+		regexp.MustCompile(`[a-z]`).MatchString(password) &&
+		regexp.MustCompile(`[0-9]`).MatchString(password) &&
+		regexp.MustCompile(`[!@#$%^&*()\-_=+\[\]{};:'",.<>/?\\|` + "`" + `~]`).MatchString(password)
 }
 
 func (t AuthServiceImpl) Login(payload authentication.LogInRequest) (model.LoginResult, *helper.ErrorModel) {
@@ -149,22 +190,97 @@ func (t AuthServiceImpl) Login(payload authentication.LogInRequest) (model.Login
 	}, nil
 }
 
-// func (t AuthServiceImpl) CheckRegisteredEmail(payload authentication.VerifyForgetPassword) bool {
-// 	user, _ := t.UserRepository.GetByEmail(payload.Email)
+func (t AuthServiceImpl) ForgotPassword(email string) *helper.ErrorModel {
+	ctx := context.Background()
+	rateLimitKey := "rate_limit:forgot_password:" + email
+	count, redisErr := config.RedisClient.Incr(ctx, rateLimitKey).Result()
+	if redisErr == nil {
+		if count == 1 {
+			config.RedisClient.Expire(ctx, rateLimitKey, time.Hour)
+		}
+		if count > 3 {
+			return &helper.ErrorModel{Code: 429, Message: "Too many requests. Please try again later."}
+		}
+	}
 
-// 	if user != nil {
-// 		return true
-// 	} else {
-// 		return false
-// 	}
-// }
+	user, userErr := t.UserRepository.GetByEmail(email)
+	if userErr != nil {
+		return nil
+	}
 
-// func (t AuthServiceImpl) ResetPassword(payload authentication.ResetPassword) *helper.CustomError {
-// 	err := t.UserRepository.UpdatePasssword(payload.Email, payload.NewPassword)
+	t.PasswordResetTokenRepository.InvalidateByUserID(user.ID.String())
 
-// 	if err != nil {
-// 		return err
-// 	} else {
-// 		return nil
-// 	}
-// }
+	rawToken, tokenHash, genErr := generateSecureToken()
+	if genErr != nil {
+		msg := "Failed to generate reset token"
+		return helper.ErrorCatcher(genErr, 500, &msg)
+	}
+
+	expiresAt := time.Now().Add(30 * time.Minute)
+	resetToken := dbModel.PasswordResetToken{
+		UserID:    user.ID,
+		TokenHash: tokenHash,
+		ExpiresAt: &expiresAt,
+	}
+	if storeErr := t.PasswordResetTokenRepository.Create(resetToken); storeErr != nil {
+		return storeErr
+	}
+
+	resetLink := t.Config.FrontendURL + "/reset-password?token=" + rawToken
+	emailErr := helper.SendResetPasswordEmail(
+		t.Config.SMTPHost,
+		t.Config.SMTPPort,
+		t.Config.SMTPUser,
+		t.Config.SMTPPassword,
+		t.Config.SMTPFrom,
+		user.Email,
+		resetLink,
+	)
+	if emailErr != nil {
+		t.PasswordResetTokenRepository.InvalidateByUserID(user.ID.String())
+		msg := "Failed to send reset email. Please try again."
+		return helper.ErrorCatcher(emailErr, 500, &msg)
+	}
+
+	return nil
+}
+
+func (t AuthServiceImpl) ResetPassword(token, newPassword string) *helper.ErrorModel {
+	if !isPasswordComplex(newPassword) {
+		return &helper.ErrorModel{Code: 422, Message: "Password does not meet the required complexity."}
+	}
+
+	tokenHash := hashToken(token)
+	resetToken, _ := t.PasswordResetTokenRepository.GetByTokenHash(tokenHash)
+	if resetToken == nil {
+		return &helper.ErrorModel{Code: 400, Message: "Reset token is invalid or has expired."}
+	}
+
+	if resetToken.UsedAt != nil {
+		return &helper.ErrorModel{Code: 400, Message: "Reset token has already been used."}
+	}
+
+	if time.Now().After(*resetToken.ExpiresAt) {
+		return &helper.ErrorModel{Code: 400, Message: "Reset token is invalid or has expired."}
+	}
+
+	hashedPassword, hashErr := dbModel.HashPasswordString(newPassword)
+	if hashErr != nil {
+		msg := "Failed to process new password"
+		return helper.ErrorCatcher(hashErr, 500, &msg)
+	}
+
+	user, userErr := t.UserRepository.Get(resetToken.UserID.String(), false)
+	if userErr != nil {
+		return userErr
+	}
+
+	user.Password = *hashedPassword
+	if updateErr := t.UserRepository.Update(*user); updateErr != nil {
+		return updateErr
+	}
+
+	t.PasswordResetTokenRepository.MarkUsed(tokenHash)
+
+	return nil
+}
