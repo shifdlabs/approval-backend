@@ -14,4 +14,5 @@ const (
 	NumberingFormat    UserRole = "Numbering Format"
 	DocumentNumbers    UserRole = "Document Numbers"
 	Signature          UserRole = "Signature"
+	Delegator          UserRole = "Delegator"
 )

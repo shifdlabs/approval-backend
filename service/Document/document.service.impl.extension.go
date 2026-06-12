@@ -6,6 +6,7 @@ import (
 	"Microservice/helper"
 	"Microservice/model"
 	"fmt"
+	"time"
 )
 
 func (t DocumentServiceImpl) mapDocumentsToDocumentResponse(documents []model.Document) []response.DocumentResponse {
@@ -137,7 +138,7 @@ func (t DocumentServiceImpl) convertToDocumentDetailResponse(document model.Docu
 		InternalRecipients: &recipients,
 		CreatedAt:          *document.CreatedAt,
 		UpdatedAt:          *document.UpdatedAt,
-		IsApprover:         currentApprover.UserID.String() == userId,
+		IsApprover:         t.isApproverOrDelegate(currentApprover, document.Status, userId),
 		IsAllowToUpdate:    document.Author.ID.String() == userId && document.Status == 99,
 	}
 
@@ -201,6 +202,32 @@ func (t DocumentServiceImpl) getApprovers(document model.Document) []string {
 	}
 
 	return approverIds
+}
+
+// isApproverOrDelegate returns true when userId is either the direct sequence approver
+// or is in the owner-chain that delegates authority to userId on today's date.
+func (t DocumentServiceImpl) isApproverOrDelegate(currentApprover model.DocumentSequence, documentStatus int, userId string) bool {
+	if documentStatus != 1 {
+		fmt.Printf("[isApproverOrDelegate] status=%d != 1, returning false\n", documentStatus)
+		return false
+	}
+	seqUserID := currentApprover.UserID.String()
+	fmt.Printf("[isApproverOrDelegate] seqUserID=%s userId=%s\n", seqUserID, userId)
+	if seqUserID == userId {
+		return true
+	}
+	ownerChain, err := t.getOwnerChainForDelegate(userId, time.Now())
+	fmt.Printf("[isApproverOrDelegate] ownerChain=%v err=%v\n", ownerChain, err)
+	if err != nil {
+		return false
+	}
+	for _, ownerID := range ownerChain {
+		if ownerID == seqUserID {
+			fmt.Printf("[isApproverOrDelegate] delegate match found, returning true\n")
+			return true
+		}
+	}
+	return false
 }
 
 func (t DocumentServiceImpl) getCurrentApprover(sequences []model.DocumentSequence, document model.Document) model.DocumentSequence {

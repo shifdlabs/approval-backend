@@ -6,6 +6,7 @@ import (
 	"Microservice/helper"
 	"Microservice/model"
 	carbonCopyReposiory "Microservice/repository/CarbonCopy"
+	delegatorRepository "Microservice/repository/Delegator"
 	repository "Microservice/repository/Document"
 	documentAttachmentRepository "Microservice/repository/DocumentAttachment"
 	documentHistoryReposiory "Microservice/repository/DocumentHistory"
@@ -36,6 +37,7 @@ type DocumentServiceImpl struct {
 	DocumentNumbersRepository    documentNumbersRepository.DocumentNumbersRepository
 	DocumentReferenceRepository  documentReferenceRepository.DocumentReferenceRepository
 	SignatureRepository          signatureRepository.SignatureRepository
+	DelegatorRepository          delegatorRepository.DelegatorRepository
 	Validate                     *validator.Validate
 	Db                           *gorm.DB
 }
@@ -52,6 +54,7 @@ func NewDocumentServiceImpl(
 	documentNumbersRepository documentNumbersRepository.DocumentNumbersRepository,
 	documentReferenceRepository documentReferenceRepository.DocumentReferenceRepository,
 	signatureRepository signatureRepository.SignatureRepository,
+	delegatorRepo delegatorRepository.DelegatorRepository,
 	Db *gorm.DB,
 	validate *validator.Validate) DocumentService {
 	return &DocumentServiceImpl{
@@ -66,6 +69,7 @@ func NewDocumentServiceImpl(
 		DocumentNumbersRepository:    documentNumbersRepository,
 		DocumentReferenceRepository:  documentReferenceRepository,
 		SignatureRepository:          signatureRepository,
+		DelegatorRepository:          delegatorRepo,
 		Db:                           Db,
 		Validate:                     validate,
 	}
@@ -247,13 +251,87 @@ func (t DocumentServiceImpl) GetAllReferences(query string) ([]response.Document
 }
 
 func (t DocumentServiceImpl) GetAllAuthorization(userId string) ([]response.DocumentResponse, *helper.ErrorModel) {
+	today := time.Now()
 
-	result, fetchError := t.DocumentRepository.GetAllAuthorization(userId)
-	if fetchError != nil {
-		return nil, fetchError
-	} else {
-		return t.mapDocumentsToDocumentResponse(result), nil
+	// Find all ownerIDs whose delegation chain resolves to the current user (BFS backward)
+	ownerChain, errChain := t.getOwnerChainForDelegate(userId, today)
+	if errChain != nil {
+		return nil, errChain
 	}
+
+	userIDs := append([]string{userId}, ownerChain...)
+
+	var allDocuments []model.Document
+	seen := map[string]bool{}
+
+	for _, uid := range userIDs {
+		docs, fetchError := t.DocumentRepository.GetAllAuthorization(uid)
+		if fetchError != nil {
+			return nil, fetchError
+		}
+		for _, doc := range docs {
+			docID := doc.ID.String()
+			if !seen[docID] {
+				// For delegated docs, verify end-user of the chain is really the current user
+				if uid != userId {
+					resolved, errResolve := t.resolveDelegate(uid, today)
+					if errResolve != nil || resolved != userId {
+						continue
+					}
+				}
+				seen[docID] = true
+				allDocuments = append(allDocuments, doc)
+			}
+		}
+	}
+
+	return t.mapDocumentsToDocumentResponse(allDocuments), nil
+}
+
+// resolveDelegate follows the delegation chain from ownerID and returns the final delegate ID.
+func (t DocumentServiceImpl) resolveDelegate(ownerID string, date time.Time) (string, *helper.ErrorModel) {
+	const maxDepth = 10
+	current := ownerID
+	for i := 0; i < maxDepth; i++ {
+		delegation, err := t.DelegatorRepository.GetActiveDelegationByOwnerID(current, date)
+		if err != nil {
+			return "", err
+		}
+		if delegation == nil {
+			return current, nil
+		}
+		next := delegation.DelegateID.String()
+		if next == ownerID {
+			return current, nil // circular — stop
+		}
+		current = next
+	}
+	return current, nil
+}
+
+// getOwnerChainForDelegate returns all ownerIDs whose delegation chain eventually resolves to delegateID.
+func (t DocumentServiceImpl) getOwnerChainForDelegate(delegateID string, date time.Time) ([]string, *helper.ErrorModel) {
+	visited := map[string]bool{delegateID: true}
+	result := []string{}
+	queue := []string{delegateID}
+
+	for len(queue) > 0 && len(result) < 100 {
+		current := queue[0]
+		queue = queue[1:]
+
+		ownerIDs, err := t.DelegatorRepository.GetOwnerIDsByDelegateID(current, date)
+		if err != nil {
+			return nil, err
+		}
+		for _, ownerID := range ownerIDs {
+			if !visited[ownerID] {
+				visited[ownerID] = true
+				result = append(result, ownerID)
+				queue = append(queue, ownerID)
+			}
+		}
+	}
+	return result, nil
 }
 
 func (t DocumentServiceImpl) GetAllInProgress(userId string) ([]response.DocumentResponse, *helper.ErrorModel) {
@@ -741,71 +819,108 @@ func (t DocumentServiceImpl) Authorize(request request.Authorize, userId string)
 
 	document, err := t.DocumentRepository.Get(request.DocumentID)
 	if err != nil {
-		msg := "Structure Error"
-		return helper.ErrorCatcher(errStructure, 500, &msg)
+		msg := "Failed to get document"
+		return helper.ErrorCatcher(fmt.Errorf("document not found"), 404, &msg)
 	}
 
 	sequences, fetchSequenceErr := t.DocumentSequenceRepository.GetSequencesByDocumentId(document.ID.String())
 	if fetchSequenceErr != nil {
-		msg := "Structure Error"
-		return helper.ErrorCatcher(errStructure, 500, &msg)
+		msg := "Failed to get document sequences"
+		return helper.ErrorCatcher(fmt.Errorf("sequences not found"), 500, &msg)
 	}
 
-	if document != nil && len(sequences) > 0 {
-		userIdUUID, _ := uuid.FromString(userId)
-		if request.State == 1 { // Approved
-			// Check if user has signature
-			hasSignature := false
-			_, errSignature := t.SignatureRepository.GetByUserId(userId)
-			if errSignature == nil {
-				hasSignature = true
-			}
+	if document == nil || len(sequences) == 0 {
+		msg := "Document or sequences not found"
+		return helper.ErrorCatcher(fmt.Errorf("not found"), 404, &msg)
+	}
 
-			for i, seq := range sequences {
-				if seq.UserID.String() == userId && seq.Step == document.Step {
-					sequences[i].Signature = hasSignature
-					errUpdateSeq := t.Db.Save(&sequences[i]).Error
-					if errUpdateSeq != nil {
-						msg := "Failed to update signature status"
-						return helper.ErrorCatcher(errUpdateSeq, 500, &msg)
-					}
-					break
+	today := time.Now()
+	userIdUUID, _ := uuid.FromString(userId)
+
+	// Determine which sequence user corresponds to the current approver.
+	// This may be the current user directly, or the current user acting as a delegate.
+	var sequenceUserID string
+	var onBehalfOfID *uuid.UUID
+
+	for _, seq := range sequences {
+		if seq.Step != document.Step {
+			continue
+		}
+		seqUserStr := seq.UserID.String()
+
+		if seqUserStr == userId {
+			// Direct authorization
+			sequenceUserID = seqUserStr
+			break
+		}
+
+		// Check if userId is the resolved delegate for this sequence user
+		resolved, errResolve := t.resolveDelegate(seqUserStr, today)
+		if errResolve != nil {
+			return errResolve
+		}
+		if resolved == userId {
+			sequenceUserID = seqUserStr
+			seqUserUUID, _ := uuid.FromString(seqUserStr)
+			onBehalfOfID = &seqUserUUID
+			break
+		}
+	}
+
+	if sequenceUserID == "" {
+		msg := "You are not authorized to approve this document"
+		return helper.ErrorCatcher(fmt.Errorf("unauthorized"), 403, &msg)
+	}
+
+	if request.State == 1 { // Approved
+		hasSignature := false
+		_, errSignature := t.SignatureRepository.GetByUserId(userId)
+		if errSignature == nil {
+			hasSignature = true
+		}
+
+		for i, seq := range sequences {
+			if seq.UserID.String() == sequenceUserID && seq.Step == document.Step {
+				sequences[i].Signature = hasSignature
+				errUpdateSeq := t.Db.Save(&sequences[i]).Error
+				if errUpdateSeq != nil {
+					msg := "Failed to update signature status"
+					return helper.ErrorCatcher(errUpdateSeq, 500, &msg)
 				}
+				break
 			}
-
-			if (document.Step + 1) <= len(sequences) {
-				document.Status = 1
-				document.Step = (document.Step + 1)
-			} else {
-				document.Status = 2
-			}
-		} else if request.State == 2 { // Rejected
-			document.Status = 99
-		} else if request.State == 3 { // Cancelled
-			document.Status = 3
 		}
 
-		isApproved := request.State == 1
-
-		errResponse := t.DocumentHistoryRepository.Create(
-			model.DocumentHistory{
-				Document:    document,
-				Description: request.Comment,
-				UserID:      userIdUUID,
-				IsApproved:  isApproved,
-			},
-		)
-
-		if errResponse != nil {
-			msg := "Structure Error"
-			return helper.ErrorCatcher(errStructure, 500, &msg)
+		if (document.Step + 1) <= len(sequences) {
+			document.Status = 1
+			document.Step = (document.Step + 1)
+		} else {
+			document.Status = 2
 		}
+	} else if request.State == 2 { // Rejected
+		document.Status = 99
+	} else if request.State == 3 { // Cancelled
+		document.Status = 3
+	}
 
-		errDocumentResoponse := t.DocumentRepository.Update(*document) // There's problem, the step not updated!
-		if errDocumentResoponse != nil {
-			msg := "Structure Error"
-			return helper.ErrorCatcher(errStructure, 500, &msg)
-		}
+	isApproved := request.State == 1
+
+	historyEntry := model.DocumentHistory{
+		Document:     document,
+		Description:  request.Comment,
+		UserID:       userIdUUID,
+		OnBehalfOfID: onBehalfOfID,
+		IsApproved:   isApproved,
+	}
+
+	if errResponse := t.DocumentHistoryRepository.Create(historyEntry); errResponse != nil {
+		msg := "Failed to create document history"
+		return helper.ErrorCatcher(fmt.Errorf("history creation failed"), 500, &msg)
+	}
+
+	if errDocumentResponse := t.DocumentRepository.Update(*document); errDocumentResponse != nil {
+		msg := "Failed to update document"
+		return helper.ErrorCatcher(fmt.Errorf("document update failed"), 500, &msg)
 	}
 
 	return nil

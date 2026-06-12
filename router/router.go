@@ -52,6 +52,7 @@ func NewRouter(
 	numberingFormatController *controller.NumberingFormatController,
 	documentNumbersController *controller.DocumentNumbersController,
 	signatureController *controller.SignatureController,
+	delegatorController *controller.DelegatorController,
 ) *gin.Engine {
 	service := gin.Default()
 	service.Use(CORS())
@@ -193,6 +194,13 @@ func NewRouter(
 	protectedSignatureRouter.PUT("/:userId", signatureController.Update)
 	protectedSignatureRouter.DELETE("/:userId", signatureController.Delete)
 	protectedSignatureRouter.GET("/:userId", signatureController.GetByUserId)
+
+	protectedDelegatorRouter := router.Group("/delegator")
+	protectedDelegatorRouter.Use(middleware.DeserializeUser(Db))
+	protectedDelegatorRouter.GET("", delegatorController.GetAll)
+	protectedDelegatorRouter.POST("", delegatorController.Create)
+	protectedDelegatorRouter.PUT("/:id", delegatorController.Update)
+	protectedDelegatorRouter.DELETE("/:id", delegatorController.Delete)
 
 	return service
 }

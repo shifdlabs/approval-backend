@@ -14,6 +14,7 @@ import (
 	appSettingsRepository "Microservice/repository/AppSettings"
 	bookmarkRepository "Microservice/repository/Bookmark"
 	carbonCopiesRepository "Microservice/repository/CarbonCopy"
+	delegatorRepository "Microservice/repository/Delegator"
 	documentRepository "Microservice/repository/Document"
 	documentAttachmentRepository "Microservice/repository/DocumentAttachment"
 	documentHistoryRepository "Microservice/repository/DocumentHistory"
@@ -33,6 +34,7 @@ import (
 	appSettingService "Microservice/service/AppSettings"
 	authService "Microservice/service/Authentication"
 	bookmarkService "Microservice/service/Bookmark"
+	delegatorService "Microservice/service/Delegator"
 	documentService "Microservice/service/Document"
 	documentAttachmentService "Microservice/service/DocumentAttachment"
 	documentHistoryService "Microservice/service/DocumentHistory"
@@ -101,6 +103,8 @@ func main() {
 	db.AutoMigrate(&model.Document{}, &model.DocumentNumbers{})
 	db.AutoMigrate(&model.User{}, &model.Signature{})
 	db.AutoMigrate(&model.User{}, &model.PasswordResetToken{})
+	db.AutoMigrate(&model.Delegator{})
+	db.AutoMigrate(&model.User{}, &model.Delegator{})
 
 	// Repositories
 	userRepository := userRepository.NewUserRepositoryImpl(db)
@@ -121,6 +125,7 @@ func main() {
 	signatureRepository := signatureRepository.NewSignatureRepositoryImpl(db)
 	failedLoginAttemptRepository := failedLoginAttemptRepository.NewFailedLoginAttemptRepositoryImpl(db)
 	passwordResetTokenRepository := passwordResetTokenRepository.NewPasswordResetTokenRepositoryImpl(db)
+	delegatorRepository := delegatorRepository.NewDelegatorRepositoryImpl(db)
 
 	// Servic
 	tokenService := tokenService.NewTokenServiceImpl(userRepository)
@@ -128,7 +133,7 @@ func main() {
 	userService := userService.NewUserServiceImpl(userRepository, positionRepositoy, failedLoginAttemptRepository, validate)
 	userLogService := userLogService.NewUserLogServiceImpl(userLogRepository, validate)
 	documentSequenceService := documentSequenceService.NewDocumentSequenceServiceImpl(documentSequenceRepository, validate)
-	documentService := documentService.NewDocumentServiceImpl(documentRepository, userRepository, documentSequenceRepository, documentAttachmentRepository, documentHistoryRepository, recipientRepository, carbonCopiesRepository, userLogRepository, documentNumbersRepository, documentReferenceRepository, signatureRepository, db, validate)
+	documentService := documentService.NewDocumentServiceImpl(documentRepository, userRepository, documentSequenceRepository, documentAttachmentRepository, documentHistoryRepository, recipientRepository, carbonCopiesRepository, userLogRepository, documentNumbersRepository, documentReferenceRepository, signatureRepository, delegatorRepository, db, validate)
 	documentHistoryService := documentHistoryService.NewDocumentHistoryServiceImpl(documentHistoryRepository, validate)
 	documentAttachmentService := documentAttachmentService.NewDocumentAttachmentServiceImpl(documentAttachmentRepository, validate)
 	positionService := positionService.NewPositionServiceImpl(positionRepositoy, validate)
@@ -139,6 +144,7 @@ func main() {
 	numberingFormatService := numberingFormatService.NewNumberingFormatServiceImpl(numberingFormatRepository, numberingGroupRepository, validate)
 	documentNumbersService := documentNumbersService.NewDocumentNumbersServiceImpl(documentNumbersRepository, numberingFormatRepository, validate)
 	signatureService := signatureService.NewSignatureServiceImpl(signatureRepository, validate)
+	delegatorSvc := delegatorService.NewDelegatorServiceImpl(delegatorRepository, validate)
 
 	// Controllers
 	userController := controller.NewUserController(userService)
@@ -157,6 +163,7 @@ func main() {
 	numberingFormatController := controller.NewNumberingFormatController(numberingFormatService, userLogService)
 	documentNumbersController := controller.NewDocumentNumbersController(documentNumbersService, userLogService)
 	signatureController := controller.NewSignatureController(signatureService)
+	delegatorController := controller.NewDelegatorController(delegatorSvc)
 
 	// Initialize Router
 	routes := router.NewRouter(
@@ -177,6 +184,7 @@ func main() {
 		numberingFormatController,
 		documentNumbersController,
 		signatureController,
+		delegatorController,
 	)
 
 	// Intialize Server
