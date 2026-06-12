@@ -2,27 +2,21 @@ package userlog
 
 import (
 	response "Microservice/data/response/UserLog"
-	"Microservice/model"
+	repository "Microservice/repository/UserLog"
 )
 
-func (t UserLogServiceImpl) mapUserLogToUserLogResponse(documentHistories []model.UserLog) []response.UserLogResponse {
-	responseDocuments := make([]response.UserLogResponse, len(documentHistories))
-	for i, userLog := range documentHistories {
-		responseDocuments[i] = t.convertUserLogToUserLogResponse(userLog)
+func (t UserLogServiceImpl) mapUserLogToUserLogResponse(rows []repository.UserLogWithName) []response.UserLogResponse {
+	responseDocuments := make([]response.UserLogResponse, len(rows))
+	for i, row := range rows {
+		responseDocuments[i] = response.UserLogResponse{
+			Id:       row.ID,
+			UserID:   &row.UserID,
+			UserName: row.UserName,
+			Action:   row.Action,
+			Module:   row.Module,
+			Log:      row.Log,
+			LogDate:  *row.LogDate,
+		}
 	}
 	return responseDocuments
-}
-
-func (t UserLogServiceImpl) convertUserLogToUserLogResponse(userLog model.UserLog) response.UserLogResponse {
-	// Perform necessary conversion logic here, potentially selecting specific fields
-	responseDocument := response.UserLogResponse{
-		Id:      userLog.ID,
-		UserID:  &userLog.UserID,
-		Action:  userLog.Action,
-		Module:  userLog.Module,
-		Log:     userLog.Log,
-		LogDate: *userLog.LogDate,
-	}
-
-	return responseDocument
 }

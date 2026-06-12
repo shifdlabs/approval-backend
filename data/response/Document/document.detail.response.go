@@ -27,6 +27,7 @@ type DocumentDetailResponse struct {
 	UpdatedAt          time.Time                  `json:"updatedAt"`
 	IsApprover         bool                       `json:"isApprover"`
 	IsAllowToUpdate    bool                       `json:"isAllowToUpdate"`
+	CanRecall          bool                       `json:"canRecall"`
 }
 
 type DocumentReference struct {

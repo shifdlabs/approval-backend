@@ -18,6 +18,8 @@ type ApproverForOverview struct {
 	Date         *string `json:"date"`
 	Signature    bool    `json:"signature"`
 	SignatureUrl *string `json:"signatureUrl"`
+	DelegateName *string `json:"delegateName"` // set when pending step has active delegation
+	OnBehalfOf   *string `json:"onBehalfOf"`   // set when approved by a delegate; value = delegate's name
 }
 
 type RejectedOverviewResponse struct {

@@ -6,9 +6,11 @@ import (
 	response "Microservice/data/response"
 	userResponse "Microservice/data/response/User"
 	"Microservice/helper"
+	"Microservice/helper/enums"
 	"Microservice/model"
 	service "Microservice/service/Authentication"
 	userService "Microservice/service/User"
+	userLogService "Microservice/service/UserLog"
 	"Microservice/utils"
 
 	"net/http"
@@ -17,12 +19,13 @@ import (
 )
 
 type AuthController struct {
-	authService service.AuthService
-	userService userService.UserService
+	authService    service.AuthService
+	userService    userService.UserService
+	userLogService userLogService.UserLogService
 }
 
-func NewAuthController(service service.AuthService, userService userService.UserService) *AuthController {
-	return &AuthController{authService: service, userService: userService}
+func NewAuthController(service service.AuthService, userService userService.UserService, userLogSvc userLogService.UserLogService) *AuthController {
+	return &AuthController{authService: service, userService: userService, userLogService: userLogSvc}
 }
 
 func (controller *AuthController) LogIn(ctx *gin.Context) {
@@ -42,6 +45,12 @@ func (controller *AuthController) LogIn(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+
+	controller.userLogService.CreateLog(model.UserLog{
+		UserID: *loginResult.User.ID,
+		Action: string(enums.Login),
+		Module: string(enums.Authentication),
+	})
 
 	utils.SuccessResponse(ctx,
 		userResponse.LoginResponse{
@@ -137,6 +146,15 @@ func (controller *AuthController) ResetPassword(ctx *gin.Context) {
 }
 
 func (controller *AuthController) Logout(ctx *gin.Context) {
+	userUUID := helper.GetUserUUID(ctx)
+	if userUUID != nil {
+		controller.userLogService.CreateLog(model.UserLog{
+			UserID: *userUUID,
+			Action: string(enums.Logout),
+			Module: string(enums.Authentication),
+		})
+	}
+
 	ctx.JSON(http.StatusOK, response.Response{
 		Success: true,
 		Code:    200,

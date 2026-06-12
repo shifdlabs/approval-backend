@@ -3,7 +3,10 @@ package controller
 import (
 	request "Microservice/data/request/Delegator"
 	"Microservice/helper"
+	"Microservice/helper/enums"
+	"Microservice/model"
 	service "Microservice/service/Delegator"
+	userLogService "Microservice/service/UserLog"
 	"Microservice/utils"
 
 	"github.com/gin-gonic/gin"
@@ -11,10 +14,11 @@ import (
 
 type DelegatorController struct {
 	delegatorService service.DelegatorService
+	userLogService   userLogService.UserLogService
 }
 
-func NewDelegatorController(svc service.DelegatorService) *DelegatorController {
-	return &DelegatorController{delegatorService: svc}
+func NewDelegatorController(svc service.DelegatorService, userLogSvc userLogService.UserLogService) *DelegatorController {
+	return &DelegatorController{delegatorService: svc, userLogService: userLogSvc}
 }
 
 func (c *DelegatorController) GetAll(ctx *gin.Context) {
@@ -54,6 +58,11 @@ func (c *DelegatorController) Create(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+	c.userLogService.CreateLog(model.UserLog{
+		UserID: *helper.GetUserUUID(ctx),
+		Action: string(enums.Create),
+		Module: string(enums.Delegator),
+	})
 	utils.SuccessResponse(ctx, nil)
 }
 
@@ -81,6 +90,11 @@ func (c *DelegatorController) Update(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+	c.userLogService.CreateLog(model.UserLog{
+		UserID: *helper.GetUserUUID(ctx),
+		Action: string(enums.Update),
+		Module: string(enums.Delegator),
+	})
 	utils.SuccessResponse(ctx, nil)
 }
 
@@ -97,5 +111,10 @@ func (c *DelegatorController) Delete(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+	c.userLogService.CreateLog(model.UserLog{
+		UserID: *helper.GetUserUUID(ctx),
+		Action: string(enums.Delete),
+		Module: string(enums.Delegator),
+	})
 	utils.SuccessResponse(ctx, nil)
 }

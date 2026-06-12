@@ -15,4 +15,7 @@ const (
 	DocumentNumbers    UserRole = "Document Numbers"
 	Signature          UserRole = "Signature"
 	Delegator          UserRole = "Delegator"
+	Authentication     UserRole = "Authentication"
+	Profile            UserRole = "Profile"
+	AppSettingsModule  UserRole = "App Settings"
 )

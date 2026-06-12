@@ -53,6 +53,7 @@ func NewRouter(
 	documentNumbersController *controller.DocumentNumbersController,
 	signatureController *controller.SignatureController,
 	delegatorController *controller.DelegatorController,
+	verificationController *controller.VerificationController,
 ) *gin.Engine {
 	service := gin.Default()
 	service.Use(CORS())
@@ -120,6 +121,7 @@ func NewRouter(
 	protectedDocumentRouter.GET("/dashboard/activities", documentController.GetRecentActivities)
 	protectedDocumentRouter.GET("/dashboard/recent", documentController.GetRecentDocuments)
 	protectedDocumentRouter.GET("/search", documentController.Search)
+	protectedDocumentRouter.POST("/:id/recall", documentController.Recall)
 
 	protectedDocumentHistoryRouter := router.Group("/documenthistory")
 	protectedDocumentHistoryRouter.Use(middleware.DeserializeUser(Db))
@@ -139,6 +141,7 @@ func NewRouter(
 	protectedUserLogRouter := router.Group("/userlogs")
 	protectedUserLogRouter.Use(middleware.DeserializeUser(Db))
 	protectedUserLogRouter.GET("", userLogController.GetAll)
+	protectedUserLogRouter.GET("/export", userLogController.Export)
 
 	protectedDocumentSequenceRouter := router.Group("/documentsequence")
 	protectedDocumentSequenceRouter.Use(middleware.DeserializeUser(Db))
@@ -201,6 +204,10 @@ func NewRouter(
 	protectedDelegatorRouter.POST("", delegatorController.Create)
 	protectedDelegatorRouter.PUT("/:id", delegatorController.Update)
 	protectedDelegatorRouter.DELETE("/:id", delegatorController.Delete)
+
+	// Public verification route — no auth middleware
+	verificationRouter := router.Group("/verification")
+	verificationRouter.GET("/:id", verificationController.GetVerification)
 
 	return service
 }

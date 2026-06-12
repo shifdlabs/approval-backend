@@ -5,6 +5,7 @@ import (
 	response "Microservice/data/response/Document"
 	"Microservice/helper"
 	"Microservice/model"
+	appSettingsRepository "Microservice/repository/AppSettings"
 	carbonCopyReposiory "Microservice/repository/CarbonCopy"
 	delegatorRepository "Microservice/repository/Delegator"
 	repository "Microservice/repository/Document"
@@ -38,6 +39,7 @@ type DocumentServiceImpl struct {
 	DocumentReferenceRepository  documentReferenceRepository.DocumentReferenceRepository
 	SignatureRepository          signatureRepository.SignatureRepository
 	DelegatorRepository          delegatorRepository.DelegatorRepository
+	AppSettingsRepository        appSettingsRepository.AppSettingsRepository
 	Validate                     *validator.Validate
 	Db                           *gorm.DB
 }
@@ -55,6 +57,7 @@ func NewDocumentServiceImpl(
 	documentReferenceRepository documentReferenceRepository.DocumentReferenceRepository,
 	signatureRepository signatureRepository.SignatureRepository,
 	delegatorRepo delegatorRepository.DelegatorRepository,
+	appSettingsRepo appSettingsRepository.AppSettingsRepository,
 	Db *gorm.DB,
 	validate *validator.Validate) DocumentService {
 	return &DocumentServiceImpl{
@@ -70,6 +73,7 @@ func NewDocumentServiceImpl(
 		DocumentReferenceRepository:  documentReferenceRepository,
 		SignatureRepository:          signatureRepository,
 		DelegatorRepository:          delegatorRepo,
+		AppSettingsRepository:        appSettingsRepo,
 		Db:                           Db,
 		Validate:                     validate,
 	}
@@ -368,14 +372,12 @@ func (t DocumentServiceImpl) GetInProgressOverviewByDocId(documentId string) (*r
 	}
 
 	if document != nil {
-		// Get all sequences first (including approved ones)
+		today := time.Now()
+
 		allSequences, _ := t.DocumentSequenceRepository.GetSequencesByDocumentId(document.ID.String())
-		helper.PrintValue(len(allSequences), "Total sequences fetched")
 		sequenceMap := make(map[string]*model.DocumentSequence)
 		if allSequences != nil {
 			for i, seq := range allSequences {
-				helper.PrintValue(seq.UserID.String(), "Sequence UserID")
-				helper.PrintValue(seq.Signature, "Sequence Signature value")
 				sequenceMap[seq.UserID.String()] = &allSequences[i]
 			}
 		}
@@ -385,43 +387,67 @@ func (t DocumentServiceImpl) GetInProgressOverviewByDocId(documentId string) (*r
 			return nil, fetchDocErr
 		}
 
+		// addedUserIds tracks which sequence user IDs are already represented in the timeline
 		addedUserIds := make(map[string]bool)
 
 		if history != nil {
 			for _, approver := range history {
-				user, err := t.UserRepository.Get(approver.UserID.String(), true)
-				if err != nil {
-					return nil, err
+				var displayUser *model.User
+				var onBehalfOfName *string
+
+				if approver.OnBehalfOfID != nil {
+					// Delegate approval: show the original approver's name, note who acted
+					originalUser, err := t.UserRepository.Get(approver.OnBehalfOfID.String(), true)
+					if err != nil {
+						return nil, err
+					}
+					displayUser = originalUser
+
+					delegateUser, err := t.UserRepository.Get(approver.UserID.String(), true)
+					if err != nil {
+						return nil, err
+					}
+					delegateName := delegateUser.FirstName + " " + delegateUser.LastName
+					onBehalfOfName = &delegateName
+
+					// Mark the original sequence user as handled (not the delegate)
+					addedUserIds[originalUser.ID.String()] = true
+					addedUserIds[approver.UserID.String()] = true
+				} else {
+					user, err := t.UserRepository.Get(approver.UserID.String(), true)
+					if err != nil {
+						return nil, err
+					}
+					displayUser = user
+					addedUserIds[user.ID.String()] = true
 				}
 
-				addedUserIds[user.ID.String()] = true
-
 				var signatureUrl *string
-				signature, _ := t.SignatureRepository.GetByUserId(user.ID.String())
+				signature, _ := t.SignatureRepository.GetByUserId(displayUser.ID.String())
 				if signature != nil {
 					signatureUrl = &signature.ImageURL
 				}
 
 				hasSigned := false
-				if seq, exists := sequenceMap[user.ID.String()]; exists {
+				if seq, exists := sequenceMap[displayUser.ID.String()]; exists {
 					hasSigned = seq.Signature
 				}
 
 				dateStr := approver.CreatedAt.String()
 				approvers = append(approvers, response.ApproverForOverview{
-					Name:         user.FirstName + " " + user.LastName,
-					Title:        user.Position.Name,
+					Name:         displayUser.FirstName + " " + displayUser.LastName,
+					Title:        displayUser.Position.Name,
 					Approved:     &approver.IsApproved,
 					Date:         &dateStr,
 					Signature:    hasSigned,
 					SignatureUrl: signatureUrl,
+					OnBehalfOf:   onBehalfOfName,
 				})
 			}
 		}
 
 		if allSequences != nil {
 			for _, sequence := range allSequences {
-
 				if addedUserIds[sequence.UserID.String()] {
 					continue
 				}
@@ -431,11 +457,21 @@ func (t DocumentServiceImpl) GetInProgressOverviewByDocId(documentId string) (*r
 					return nil, err
 				}
 
-				// Fetch signature if exists
 				var signatureUrl *string
 				signature, _ := t.SignatureRepository.GetByUserId(user.ID.String())
 				if signature != nil {
 					signatureUrl = &signature.ImageURL
+				}
+
+				// Check if this pending approver has an active delegation
+				var delegateName *string
+				delegation, _ := t.DelegatorRepository.GetActiveDelegationByOwnerID(sequence.UserID.String(), today)
+				if delegation != nil {
+					delegateUser, err := t.UserRepository.Get(delegation.DelegateID.String(), true)
+					if err == nil {
+						name := delegateUser.FirstName + " " + delegateUser.LastName
+						delegateName = &name
+					}
 				}
 
 				approvers = append(approvers, response.ApproverForOverview{
@@ -445,6 +481,7 @@ func (t DocumentServiceImpl) GetInProgressOverviewByDocId(documentId string) (*r
 					Date:         nil,
 					Signature:    sequence.Signature,
 					SignatureUrl: signatureUrl,
+					DelegateName: delegateName,
 				})
 			}
 		}
@@ -1222,4 +1259,120 @@ func (s *DocumentServiceImpl) Search(keyword string) ([]response.SearchDocumentR
 	}
 
 	return results, nil
+}
+
+func (t DocumentServiceImpl) GetVerification(documentId string) (*response.VerificationResponse, *helper.ErrorModel) {
+	document, err := t.DocumentRepository.Get(documentId)
+	if err != nil || document == nil {
+		msg := "Document not found"
+		return nil, helper.ErrorCatcher(fmt.Errorf("not found"), 404, &msg)
+	}
+
+	if document.Status != 2 {
+		msg := "Document is not yet finalized"
+		return nil, helper.ErrorCatcher(fmt.Errorf("not finished"), 404, &msg)
+	}
+
+	// Document number: prefer custom, else from document_numbers table
+	docNumber := ""
+	switch document.PublicationNumberType {
+	case 3:
+		if document.CustomPublicationNumber != nil {
+			docNumber = *document.CustomPublicationNumber
+		}
+	case 1, 2:
+		docNum, errDocNum := t.DocumentNumbersRepository.GetByDocumentID(document.ID)
+		if errDocNum == nil && docNum != nil {
+			docNumber = docNum.Value
+		}
+	}
+
+	// Fetch all app_settings at once for efficiency
+	settingsMap := map[string]string{}
+	if allSettings, errSettings := t.AppSettingsRepository.GetAll(); errSettings == nil {
+		for _, s := range allSettings {
+			settingsMap[s.Key] = s.Value
+		}
+	}
+	get := func(key string) string { return settingsMap[key] }
+
+	// Last approver name (last history record)
+	lastApprover, _ := t.DocumentHistoryRepository.GetLastApprover(documentId)
+	lastApproverName := ""
+	if lastApprover != nil {
+		actorID := lastApprover.UserID.String()
+		if lastApprover.OnBehalfOfID != nil {
+			actorID = lastApprover.OnBehalfOfID.String()
+		}
+		user, errUser := t.UserRepository.Get(actorID, true)
+		if errUser == nil && user != nil {
+			lastApproverName = user.FirstName + " " + user.LastName
+		}
+	}
+
+	// Approval date from document.UpdatedAt
+	approvalDate := ""
+	if document.UpdatedAt != nil {
+		approvalDate = document.UpdatedAt.Format("02 January 2006")
+	}
+
+	return &response.VerificationResponse{
+		Subject:            document.Subject,
+		Body:               document.Body,
+		DocumentNumber:     docNumber,
+		OrganizationName:   get("company_name"),
+		ApprovalDate:       approvalDate,
+		LastApproverName:   lastApproverName,
+		Type:               document.Type,
+		CompanyLogoUrl:     get("company_logo_url"),
+		CompanyAddress:     get("company_address"),
+		CompanyCity:        get("company_city"),
+		CompanyPhone:       get("company_phone_number"),
+		CompanyEmail:       get("company_email"),
+		CompanyDescription: get("company_description"),
+	}, nil
+}
+
+func (t DocumentServiceImpl) Recall(documentId string, userId string) *helper.ErrorModel {
+	document, err := t.DocumentRepository.Get(documentId)
+	if err != nil {
+		msg := "Document not found"
+		return helper.ErrorCatcher(fmt.Errorf("not found"), 404, &msg)
+	}
+
+	if document.Author.ID.String() != userId {
+		msg := "Only the document author can recall this document"
+		return helper.ErrorCatcher(fmt.Errorf("forbidden"), 403, &msg)
+	}
+
+	if document.Status != 1 {
+		msg := "Only in-progress documents can be recalled"
+		return helper.ErrorCatcher(fmt.Errorf("invalid status"), 400, &msg)
+	}
+
+	histories, errHistory := t.DocumentHistoryRepository.GetAllHistoryByDocumentId(documentId)
+	if errHistory != nil {
+		msg := "Failed to check document history"
+		return helper.ErrorCatcher(fmt.Errorf("history check failed"), 500, &msg)
+	}
+	if len(histories) > 0 {
+		msg := "Document cannot be recalled after an approver has already acted"
+		return helper.ErrorCatcher(fmt.Errorf("already actioned"), 400, &msg)
+	}
+
+	document.Status = 0
+	document.Step = 1
+	if errUpdate := t.DocumentRepository.Update(*document); errUpdate != nil {
+		msg := "Failed to recall document"
+		return helper.ErrorCatcher(fmt.Errorf("update failed"), 500, &msg)
+	}
+
+	userUUID, _ := uuid.FromString(userId)
+	t.UserLogRepository.Create(model.UserLog{
+		UserID: userUUID,
+		Action: "Recall",
+		Module: "Document",
+	})
+
+	return nil
 }

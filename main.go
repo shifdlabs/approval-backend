@@ -35,6 +35,7 @@ import (
 	authService "Microservice/service/Authentication"
 	bookmarkService "Microservice/service/Bookmark"
 	delegatorService "Microservice/service/Delegator"
+	slaService "Microservice/service/SLA"
 	documentService "Microservice/service/Document"
 	documentAttachmentService "Microservice/service/DocumentAttachment"
 	documentHistoryService "Microservice/service/DocumentHistory"
@@ -50,6 +51,7 @@ import (
 	userLogService "Microservice/service/UserLog"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 )
 
@@ -133,7 +135,7 @@ func main() {
 	userService := userService.NewUserServiceImpl(userRepository, positionRepositoy, failedLoginAttemptRepository, validate)
 	userLogService := userLogService.NewUserLogServiceImpl(userLogRepository, validate)
 	documentSequenceService := documentSequenceService.NewDocumentSequenceServiceImpl(documentSequenceRepository, validate)
-	documentService := documentService.NewDocumentServiceImpl(documentRepository, userRepository, documentSequenceRepository, documentAttachmentRepository, documentHistoryRepository, recipientRepository, carbonCopiesRepository, userLogRepository, documentNumbersRepository, documentReferenceRepository, signatureRepository, delegatorRepository, db, validate)
+	documentService := documentService.NewDocumentServiceImpl(documentRepository, userRepository, documentSequenceRepository, documentAttachmentRepository, documentHistoryRepository, recipientRepository, carbonCopiesRepository, userLogRepository, documentNumbersRepository, documentReferenceRepository, signatureRepository, delegatorRepository, appSettingsRepository, db, validate)
 	documentHistoryService := documentHistoryService.NewDocumentHistoryServiceImpl(documentHistoryRepository, validate)
 	documentAttachmentService := documentAttachmentService.NewDocumentAttachmentServiceImpl(documentAttachmentRepository, validate)
 	positionService := positionService.NewPositionServiceImpl(positionRepositoy, validate)
@@ -145,10 +147,21 @@ func main() {
 	documentNumbersService := documentNumbersService.NewDocumentNumbersServiceImpl(documentNumbersRepository, numberingFormatRepository, validate)
 	signatureService := signatureService.NewSignatureServiceImpl(signatureRepository, validate)
 	delegatorSvc := delegatorService.NewDelegatorServiceImpl(delegatorRepository, validate)
+	slaSvc := slaService.NewSLAServiceImpl(appSettingsRepository, documentRepository, documentHistoryRepository)
+
+	// Seed sla_max_days default if not present
+	if existing, _ := appSettingsRepository.GetByKey("sla_max_days"); existing == nil {
+		appSettingsRepository.Update([]model.AppSettings{{Key: "sla_max_days", Value: "7"}})
+	}
+
+	// Cron: auto-approve SLA-exceeded documents every day at 06:00
+	c := cron.New()
+	c.AddFunc("0 6 * * *", func() { slaSvc.RunAutoApprove() })
+	c.Start()
 
 	// Controllers
-	userController := controller.NewUserController(userService)
-	authController := controller.NewAuthController(authService, userService)
+	userController := controller.NewUserController(userService, userLogService)
+	authController := controller.NewAuthController(authService, userService, userLogService)
 	tokenController := controller.NewTokenController(tokenService)
 	documentController := controller.NewDocumentController(documentService, documentNumbersService, userLogService)
 	documentHistoryController := controller.NewDocumentHistoryController(documentHistoryService)
@@ -156,14 +169,15 @@ func main() {
 	documentAttachmentController := controller.NewDocumentAttachmentController(documentAttachmentService, userLogService)
 	positionController := controller.NewPositionController(positionService, userLogService)
 	userLogController := controller.NewUserLogController(userLogService)
-	appSettingsController := controller.NewAppSettingsController(appSettingsService)
+	appSettingsController := controller.NewAppSettingsController(appSettingsService, userLogService)
 	recipientController := controller.NewRecipientController(recipientService)
 	bookmarkController := controller.NewBookmarkController(bookmarkService)
 	numberingGroupController := controller.NewNumberingGroupController(numberingGroupService, userLogService)
 	numberingFormatController := controller.NewNumberingFormatController(numberingFormatService, userLogService)
 	documentNumbersController := controller.NewDocumentNumbersController(documentNumbersService, userLogService)
 	signatureController := controller.NewSignatureController(signatureService)
-	delegatorController := controller.NewDelegatorController(delegatorSvc)
+	delegatorController := controller.NewDelegatorController(delegatorSvc, userLogService)
+	verificationController := controller.NewVerificationController(documentService)
 
 	// Initialize Router
 	routes := router.NewRouter(
@@ -185,6 +199,7 @@ func main() {
 		documentNumbersController,
 		signatureController,
 		delegatorController,
+		verificationController,
 	)
 
 	// Intialize Server
