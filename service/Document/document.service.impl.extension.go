@@ -143,6 +143,7 @@ func (t DocumentServiceImpl) convertToDocumentDetailResponse(document model.Docu
 		IsApprover:         t.isApproverOrDelegate(currentApprover, document.Status, userId),
 		IsAllowToUpdate:    document.Author.ID.String() == userId && document.Status == 99,
 		CanRecall:          document.Author.ID.String() == userId && document.Status == 1 && len(document.DocumentHistory) == 0,
+		DueDate:            document.DueDate,
 	}
 
 	return response

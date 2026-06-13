@@ -51,6 +51,7 @@ import (
 	userLogService "Microservice/service/UserLog"
 	letterTemplateRepository "Microservice/repository/LetterTemplate"
 	letterTemplateService "Microservice/service/LetterTemplate"
+	emailService "Microservice/service/Email"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/robfig/cron/v3"
@@ -139,7 +140,8 @@ func main() {
 	userService := userService.NewUserServiceImpl(userRepository, positionRepositoy, failedLoginAttemptRepository, validate)
 	userLogService := userLogService.NewUserLogServiceImpl(userLogRepository, validate)
 	documentSequenceService := documentSequenceService.NewDocumentSequenceServiceImpl(documentSequenceRepository, validate)
-	documentService := documentService.NewDocumentServiceImpl(documentRepository, userRepository, documentSequenceRepository, documentAttachmentRepository, documentHistoryRepository, recipientRepository, carbonCopiesRepository, userLogRepository, documentNumbersRepository, documentReferenceRepository, signatureRepository, delegatorRepository, appSettingsRepository, db, validate)
+	emailSvc := emailService.NewEmailService(envConf.ResendAPIKey, envConf.EmailFrom, envConf.FrontendURL)
+	documentService := documentService.NewDocumentServiceImpl(documentRepository, userRepository, documentSequenceRepository, documentAttachmentRepository, documentHistoryRepository, recipientRepository, carbonCopiesRepository, userLogRepository, documentNumbersRepository, documentReferenceRepository, signatureRepository, delegatorRepository, appSettingsRepository, emailSvc, envConf.FrontendURL, db, validate)
 	documentHistoryService := documentHistoryService.NewDocumentHistoryServiceImpl(documentHistoryRepository, validate)
 	documentAttachmentService := documentAttachmentService.NewDocumentAttachmentServiceImpl(documentAttachmentRepository, validate)
 	positionService := positionService.NewPositionServiceImpl(positionRepositoy, validate)

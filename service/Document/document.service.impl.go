@@ -18,6 +18,7 @@ import (
 	signatureRepository "Microservice/repository/Signature"
 	userRepository "Microservice/repository/User"
 	userLogRepository "Microservice/repository/UserLog"
+	emailService "Microservice/service/Email"
 	"fmt"
 	"time"
 
@@ -40,6 +41,8 @@ type DocumentServiceImpl struct {
 	SignatureRepository          signatureRepository.SignatureRepository
 	DelegatorRepository          delegatorRepository.DelegatorRepository
 	AppSettingsRepository        appSettingsRepository.AppSettingsRepository
+	EmailService                 emailService.EmailService
+	FrontendURL                  string
 	Validate                     *validator.Validate
 	Db                           *gorm.DB
 }
@@ -58,6 +61,8 @@ func NewDocumentServiceImpl(
 	signatureRepository signatureRepository.SignatureRepository,
 	delegatorRepo delegatorRepository.DelegatorRepository,
 	appSettingsRepo appSettingsRepository.AppSettingsRepository,
+	emailSvc emailService.EmailService,
+	frontendURL string,
 	Db *gorm.DB,
 	validate *validator.Validate) DocumentService {
 	return &DocumentServiceImpl{
@@ -74,6 +79,8 @@ func NewDocumentServiceImpl(
 		SignatureRepository:          signatureRepository,
 		DelegatorRepository:          delegatorRepo,
 		AppSettingsRepository:        appSettingsRepo,
+		EmailService:                 emailSvc,
+		FrontendURL:                  frontendURL,
 		Db:                           Db,
 		Validate:                     validate,
 	}
@@ -195,6 +202,29 @@ func (t DocumentServiceImpl) Create(request request.CreateDocumentRequest) (*mod
 
 	// End Transaction
 	trx.Commit()
+
+	// Notify first approver if document is submitted (not a draft)
+	if newDocument.Status == 1 && len(request.Sequences) > 0 {
+		docID := newDocument.ID.String()
+		docSubject := newDocument.Subject
+		firstApproverID := request.Sequences[0].UserID
+		authorID := request.AuthorID
+		frontendURL := t.FrontendURL
+		go func() {
+			approver, err := t.UserRepository.Get(firstApproverID, true)
+			if err != nil || approver == nil {
+				return
+			}
+			author, err := t.UserRepository.Get(authorID, true)
+			if err != nil || author == nil {
+				return
+			}
+			fromName := author.FirstName + " " + author.LastName
+			documentURL := fmt.Sprintf("%s/preview/%s", frontendURL, docID)
+			t.EmailService.SendApprovalRequest(approver.Email, approver.FirstName+" "+approver.LastName, fromName, docSubject, documentURL)
+		}()
+	}
+
 	return newDocument, nil
 }
 
@@ -843,6 +873,29 @@ func (t DocumentServiceImpl) Update(request request.UpdateDocumentRequest) (*mod
 	}
 
 	trx.Commit()
+
+	// Notify first approver when document is re-submitted (not a draft)
+	if !request.IsDraft && len(request.Sequences) > 0 {
+		docID := document.ID.String()
+		docSubject := document.Subject
+		firstApproverID := request.Sequences[0].UserID
+		authorID := request.AuthorID
+		frontendURL := t.FrontendURL
+		go func() {
+			approver, err := t.UserRepository.Get(firstApproverID, true)
+			if err != nil || approver == nil {
+				return
+			}
+			author, err := t.UserRepository.Get(authorID, true)
+			if err != nil || author == nil {
+				return
+			}
+			fromName := author.FirstName + " " + author.LastName
+			documentURL := fmt.Sprintf("%s/preview/%s", frontendURL, docID)
+			t.EmailService.SendApprovalRequest(approver.Email, approver.FirstName+" "+approver.LastName, fromName, docSubject, documentURL)
+		}()
+	}
+
 	return document, nil
 }
 
@@ -959,6 +1012,67 @@ func (t DocumentServiceImpl) Authorize(request request.Authorize, userId string)
 		msg := "Failed to update document"
 		return helper.ErrorCatcher(fmt.Errorf("document update failed"), 500, &msg)
 	}
+
+	// Send email notifications (fire-and-forget, does not affect response)
+	docID := document.ID.String()
+	docSubject := document.Subject
+	docStatus := document.Status
+	docStep := document.Step
+	authorID := ""
+	if document.AuthorID != nil {
+		authorID = document.AuthorID.String()
+	}
+	rejectorID := userId
+	rejectorComment := request.Comment
+	seqSnapshot := sequences
+	frontendURL := t.FrontendURL
+
+	go func() {
+		documentURL := fmt.Sprintf("%s/preview/%s", frontendURL, docID)
+
+		switch {
+		case request.State == 2 && authorID != "": // Rejected — notify author
+			author, err := t.UserRepository.Get(authorID, true)
+			if err != nil || author == nil {
+				return
+			}
+			rejector, err := t.UserRepository.Get(rejectorID, true)
+			if err != nil || rejector == nil {
+				return
+			}
+			rejectorName := rejector.FirstName + " " + rejector.LastName
+			t.EmailService.SendDocumentRejected(author.Email, author.FirstName+" "+author.LastName, docSubject, rejectorName, rejectorComment, documentURL)
+
+		case request.State == 1 && docStatus == 2 && authorID != "": // All approved — notify author
+			author, err := t.UserRepository.Get(authorID, true)
+			if err != nil || author == nil {
+				return
+			}
+			t.EmailService.SendDocumentApproved(author.Email, author.FirstName+" "+author.LastName, docSubject, documentURL)
+
+		case request.State == 1 && docStatus == 1: // Step advanced — notify next approver
+			var nextApproverID string
+			for _, seq := range seqSnapshot {
+				if seq.Step == docStep {
+					nextApproverID = seq.UserID.String()
+					break
+				}
+			}
+			if nextApproverID == "" {
+				return
+			}
+			nextApprover, err := t.UserRepository.Get(nextApproverID, true)
+			if err != nil || nextApprover == nil {
+				return
+			}
+			prevApprover, err := t.UserRepository.Get(rejectorID, true) // rejectorID = current userId (previous approver)
+			if err != nil || prevApprover == nil {
+				return
+			}
+			fromName := prevApprover.FirstName + " " + prevApprover.LastName
+			t.EmailService.SendApprovalRequest(nextApprover.Email, nextApprover.FirstName+" "+nextApprover.LastName, fromName, docSubject, documentURL)
+		}
+	}()
 
 	return nil
 }
