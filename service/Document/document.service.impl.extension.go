@@ -31,10 +31,14 @@ func (t DocumentServiceImpl) convertDocumentToDocumentResponse(document model.Do
 			user, _ := t.UserRepository.Get(currentApprover.UserID.String(), true)
 
 			if user != nil {
+				positionName := ""
+				if user.Position != nil {
+					positionName = user.Position.Name
+				}
 				title := fmt.Sprintf("%s %s - %s",
 					user.FirstName,
 					user.LastName,
-					user.Position.Name,
+					positionName,
 				)
 
 				currentApproverTitle = &title
@@ -122,6 +126,13 @@ func (t DocumentServiceImpl) convertToDocumentDetailResponse(document model.Docu
 		publicationValue = ""
 	}
 
+	var author model.User
+	if document.Author != nil {
+		author = *document.Author
+	}
+	isAllowToUpdate := document.Author != nil && document.Author.ID.String() == userId && document.Status == 99
+	canRecall := document.Author != nil && document.Author.ID.String() == userId && document.Status == 1 && len(document.DocumentHistory) == 0
+
 	response := response.DocumentDetailResponse{
 		Id:                 &document.ID,
 		PublicationValue:   publicationValue,
@@ -132,7 +143,7 @@ func (t DocumentServiceImpl) convertToDocumentDetailResponse(document model.Docu
 		Step:               document.Step,
 		Status:             document.Status,
 		Priority:           document.Priority,
-		Author:             *document.Author,
+		Author:             author,
 		DocumentSequence:   *inProgressOverview,
 		DocumentHistory:    &documentHistories,
 		DocumentAttachment: &documentAttachment,
@@ -141,8 +152,8 @@ func (t DocumentServiceImpl) convertToDocumentDetailResponse(document model.Docu
 		CreatedAt:          *document.CreatedAt,
 		UpdatedAt:          *document.UpdatedAt,
 		IsApprover:         t.isApproverOrDelegate(currentApprover, document.Status, userId),
-		IsAllowToUpdate:    document.Author.ID.String() == userId && document.Status == 99,
-		CanRecall:          document.Author.ID.String() == userId && document.Status == 1 && len(document.DocumentHistory) == 0,
+		IsAllowToUpdate:    isAllowToUpdate,
+		CanRecall:          canRecall,
 		DueDate:            document.DueDate,
 	}
 
@@ -151,14 +162,20 @@ func (t DocumentServiceImpl) convertToDocumentDetailResponse(document model.Docu
 
 func (t DocumentServiceImpl) getInternalRecipients(documentId string) []response.InternalRecipient {
 	recipientsResponse, _ := t.RecipientRepository.GetRecipientsByDocId(documentId)
-	recipients := make([]response.InternalRecipient, len(recipientsResponse))
-	for i, recipient := range recipientsResponse {
+	recipients := make([]response.InternalRecipient, 0, len(recipientsResponse))
+	for _, recipient := range recipientsResponse {
 		user, _ := t.UserRepository.Get(recipient.UserID.String(), true)
-
-		recipients[i] = response.InternalRecipient{
-			Name:  user.FirstName + " " + user.LastName,
-			Title: user.Position.Name,
+		if user == nil {
+			continue
 		}
+		positionName := ""
+		if user.Position != nil {
+			positionName = user.Position.Name
+		}
+		recipients = append(recipients, response.InternalRecipient{
+			Name:  user.FirstName + " " + user.LastName,
+			Title: positionName,
+		})
 	}
 
 	return recipients
@@ -184,10 +201,17 @@ func (t DocumentServiceImpl) getDocumentHistory(document model.Document) []respo
 	documentHistories := make([]response.DocumentHistory, len(document.DocumentHistory))
 	for i, history := range document.DocumentHistory {
 		user, _ := t.UserRepository.Get(history.UserID.String(), true)
-
+		name := ""
+		positionName := ""
+		if user != nil {
+			name = user.FirstName + " " + user.LastName
+			if user.Position != nil {
+				positionName = user.Position.Name
+			}
+		}
 		documentHistories[i] = response.DocumentHistory{
-			Name:       user.FirstName + " " + user.LastName,
-			Title:      user.Position.Name,
+			Name:       name,
+			Title:      positionName,
 			IsApproved: history.IsApproved,
 			Reason:     history.Description,
 			UpdatedAt:  history.CreatedAt.String(),
