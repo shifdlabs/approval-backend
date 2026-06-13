@@ -7,6 +7,8 @@ import (
 	"Microservice/model"
 	"fmt"
 	"time"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 func (t DocumentServiceImpl) mapDocumentsToDocumentResponse(documents []model.Document) []response.DocumentResponse {
@@ -246,6 +248,13 @@ func (t DocumentServiceImpl) convertRequestToCreateModel(documentRequest request
 		customPublicationCode = documentRequest.PublicationValue
 	}
 
+	var templateUUID *uuid.UUID
+	if documentRequest.TemplateID != nil && *documentRequest.TemplateID != "" {
+		if parsed, err := uuid.FromString(*documentRequest.TemplateID); err == nil {
+			templateUUID = &parsed
+		}
+	}
+
 	// Store to DB
 	document := model.Document{
 		Author:                  user,
@@ -259,6 +268,7 @@ func (t DocumentServiceImpl) convertRequestToCreateModel(documentRequest request
 		Step:                    documentRequest.Step,
 		LetterHead:              documentRequest.LetterHead,
 		Status:                  documentRequest.Status,
+		TemplateID:              templateUUID,
 	}
 
 	return &document, nil

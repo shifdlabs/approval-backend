@@ -20,6 +20,7 @@ type Document struct {
 	ExternalRecipient       string     `gorm:"type:varchar"`
 	Step                    int        `gorm:"type:int"`
 	LetterHead              bool       `gorm:"type:bool;not null"`
+	TemplateID              *uuid.UUID `gorm:"type:uuid"`
 	Status                  int        `gorm:"type:int;not null"` // 0: draft, 1: Inprogress, 2: finished, 3: Cancelled, 99: rejected
 	Author                  *User      `gorm:"foreignKey:AuthorID;constraint:OnDelete:SET NULL;"`
 	DocumentSequence        []DocumentSequence

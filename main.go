@@ -49,6 +49,8 @@ import (
 	tokenService "Microservice/service/Token"
 	userService "Microservice/service/User"
 	userLogService "Microservice/service/UserLog"
+	letterTemplateRepository "Microservice/repository/LetterTemplate"
+	letterTemplateService "Microservice/service/LetterTemplate"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/robfig/cron/v3"
@@ -107,6 +109,8 @@ func main() {
 	db.AutoMigrate(&model.User{}, &model.PasswordResetToken{})
 	db.AutoMigrate(&model.Delegator{})
 	db.AutoMigrate(&model.User{}, &model.Delegator{})
+	db.AutoMigrate(&model.LetterTemplate{})
+	db.AutoMigrate(&model.Document{}, &model.LetterTemplate{})
 
 	// Repositories
 	userRepository := userRepository.NewUserRepositoryImpl(db)
@@ -148,6 +152,8 @@ func main() {
 	signatureService := signatureService.NewSignatureServiceImpl(signatureRepository, validate)
 	delegatorSvc := delegatorService.NewDelegatorServiceImpl(delegatorRepository, validate)
 	slaSvc := slaService.NewSLAServiceImpl(appSettingsRepository, documentRepository, documentHistoryRepository)
+	letterTemplateRepo := letterTemplateRepository.NewLetterTemplateRepositoryImpl(db)
+	letterTemplateSvc := letterTemplateService.NewLetterTemplateServiceImpl(letterTemplateRepo, validate)
 
 	// Seed sla_max_days default if not present
 	if existing, _ := appSettingsRepository.GetByKey("sla_max_days"); existing == nil {
@@ -178,6 +184,7 @@ func main() {
 	signatureController := controller.NewSignatureController(signatureService)
 	delegatorController := controller.NewDelegatorController(delegatorSvc, userLogService)
 	verificationController := controller.NewVerificationController(documentService)
+	letterTemplateController := controller.NewLetterTemplateController(letterTemplateSvc, userLogService)
 
 	// Initialize Router
 	routes := router.NewRouter(
@@ -200,6 +207,7 @@ func main() {
 		signatureController,
 		delegatorController,
 		verificationController,
+		letterTemplateController,
 	)
 
 	// Intialize Server

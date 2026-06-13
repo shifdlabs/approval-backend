@@ -54,6 +54,7 @@ func NewRouter(
 	signatureController *controller.SignatureController,
 	delegatorController *controller.DelegatorController,
 	verificationController *controller.VerificationController,
+	letterTemplateController *controller.LetterTemplateController,
 ) *gin.Engine {
 	service := gin.Default()
 	service.Use(CORS())
@@ -208,6 +209,15 @@ func NewRouter(
 	// Public verification route — no auth middleware
 	verificationRouter := router.Group("/verification")
 	verificationRouter.GET("/:id", verificationController.GetVerification)
+
+	// Letter template routes — GET all/by-id: semua auth user; CUD: admin only (enforced at controller level)
+	templateRouter := router.Group("/template")
+	templateRouter.Use(middleware.DeserializeUser(Db))
+	templateRouter.GET("", letterTemplateController.GetAll)
+	templateRouter.GET("/:id", letterTemplateController.GetByID)
+	templateRouter.POST("", letterTemplateController.Create)
+	templateRouter.PUT("/:id", letterTemplateController.Update)
+	templateRouter.DELETE("/:id", letterTemplateController.Delete)
 
 	return service
 }
