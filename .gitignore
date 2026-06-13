@@ -21,3 +21,10 @@
 go.work
 .env
 app.env
+
+# Claude Code internal files
+.claude/
+CLAUDE.md
+BACKEND_FORGOT_PASSWORD.md
+FRONTEND_FORGOT_PASSWORD.md
+app-installation-guidance.txt
