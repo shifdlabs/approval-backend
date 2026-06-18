@@ -279,6 +279,19 @@ func (controller *DocumentController) Authorize(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+
+	action := enums.Approve
+	if payload.State == 2 {
+		action = enums.Reject
+	} else if payload.State == 3 {
+		action = enums.Cancel
+	}
+	controller.userLogService.CreateLog(model.UserLog{
+		UserID: *helper.GetUserUUID(ctx),
+		Action: string(action),
+		Module: string(enums.Document),
+	})
+
 	utils.SuccessResponse(ctx, nil)
 }
 
@@ -407,6 +420,27 @@ func (controller *DocumentController) GetRecentDocuments(ctx *gin.Context) {
 	}
 
 	utils.SuccessResponse(ctx, recentResponse)
+}
+
+func (controller *DocumentController) Recall(ctx *gin.Context) {
+	documentId := ctx.Param("id")
+	if documentId == "" {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Document ID is required"})
+		return
+	}
+
+	userId, errParse := helper.GetUserId(ctx)
+	if errParse != nil {
+		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Invalid Request Structure."})
+		return
+	}
+
+	if err := controller.documentService.Recall(documentId, *userId); err != nil {
+		utils.ErrorResponse(ctx, *err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, nil)
 }
 
 func (controller *DocumentController) Search(ctx *gin.Context) {

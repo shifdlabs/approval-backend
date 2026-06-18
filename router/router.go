@@ -11,9 +11,14 @@ import (
 )
 
 func CORS() gin.HandlerFunc {
+	allowedOrigins := map[string]bool{
+		"http://localhost:5173":  true,
+		"http://localhost:5176":  true,
+		"https://alphasoftn.com": true,
+	}
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
-		if origin == "http://localhost:5173" {
+		if allowedOrigins[origin] {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 			c.Writer.Header().Set(
@@ -52,6 +57,9 @@ func NewRouter(
 	numberingFormatController *controller.NumberingFormatController,
 	documentNumbersController *controller.DocumentNumbersController,
 	signatureController *controller.SignatureController,
+	delegatorController *controller.DelegatorController,
+	verificationController *controller.VerificationController,
+	letterTemplateController *controller.LetterTemplateController,
 ) *gin.Engine {
 	service := gin.Default()
 	service.Use(CORS())
@@ -83,22 +91,22 @@ func NewRouter(
 
 	protectedUserRouter := router.Group("/user")
 	protectedUserRouter.Use(middleware.AuthMiddleware())
-	protectedUserRouter.POST("", userController.Create)
+	protectedUserRouter.POST("", middleware.AdminOnly(Db), userController.Create)
 	protectedUserRouter.GET("/profile", userController.Get)
 	protectedUserRouter.GET("/:id", userController.GetUserByID)
 	protectedUserRouter.GET("", userController.GetAll)
 	protectedUserRouter.GET("/except-current", userController.GetAllUserExceptCurrent)
 	protectedUserRouter.PUT("", userController.Update)
-	protectedUserRouter.DELETE("/:id", userController.Delete)
-	protectedUserRouter.DELETE("/deletes", userController.MultipleDelete)
-	protectedUserRouter.PUT("/role", userController.UpdateRole)
+	protectedUserRouter.DELETE("/:id", middleware.AdminOnly(Db), userController.Delete)
+	protectedUserRouter.DELETE("/deletes", middleware.AdminOnly(Db), userController.MultipleDelete)
+	protectedUserRouter.PUT("/role", middleware.AdminOnly(Db), userController.UpdateRole)
 	protectedUserRouter.PUT("/password", userController.UpdatePassword)
-	protectedUserRouter.PUT("/access", userController.UpdateAccess)
-	protectedUserRouter.PUT("/unlock/:userId", userController.UnlockUser)
+	protectedUserRouter.PUT("/access", middleware.AdminOnly(Db), userController.UpdateAccess)
+	protectedUserRouter.PUT("/unlock/:userId", middleware.AdminOnly(Db), userController.UnlockUser)
 	protectedUserRouter.PUT("/biodata", userController.UpdateBiodata)
 	protectedUserRouter.PUT("/email", userController.UpdateEmail)
-	protectedUserRouter.POST("/import/preview", userController.PreviewImport)
-	protectedUserRouter.POST("/import/bulk", userController.BulkImport)
+	protectedUserRouter.POST("/import/preview", middleware.AdminOnly(Db), userController.PreviewImport)
+	protectedUserRouter.POST("/import/bulk", middleware.AdminOnly(Db), userController.BulkImport)
 
 	protectedDocumentRouter := router.Group("/document")
 	protectedDocumentRouter.Use(middleware.DeserializeUser(Db))
@@ -119,6 +127,7 @@ func NewRouter(
 	protectedDocumentRouter.GET("/dashboard/activities", documentController.GetRecentActivities)
 	protectedDocumentRouter.GET("/dashboard/recent", documentController.GetRecentDocuments)
 	protectedDocumentRouter.GET("/search", documentController.Search)
+	protectedDocumentRouter.POST("/:id/recall", documentController.Recall)
 
 	protectedDocumentHistoryRouter := router.Group("/documenthistory")
 	protectedDocumentHistoryRouter.Use(middleware.DeserializeUser(Db))
@@ -138,6 +147,7 @@ func NewRouter(
 	protectedUserLogRouter := router.Group("/userlogs")
 	protectedUserLogRouter.Use(middleware.DeserializeUser(Db))
 	protectedUserLogRouter.GET("", userLogController.GetAll)
+	protectedUserLogRouter.GET("/export", userLogController.Export)
 
 	protectedDocumentSequenceRouter := router.Group("/documentsequence")
 	protectedDocumentSequenceRouter.Use(middleware.DeserializeUser(Db))
@@ -193,6 +203,26 @@ func NewRouter(
 	protectedSignatureRouter.PUT("/:userId", signatureController.Update)
 	protectedSignatureRouter.DELETE("/:userId", signatureController.Delete)
 	protectedSignatureRouter.GET("/:userId", signatureController.GetByUserId)
+
+	protectedDelegatorRouter := router.Group("/delegator")
+	protectedDelegatorRouter.Use(middleware.DeserializeUser(Db))
+	protectedDelegatorRouter.GET("", delegatorController.GetAll)
+	protectedDelegatorRouter.POST("", delegatorController.Create)
+	protectedDelegatorRouter.PUT("/:id", delegatorController.Update)
+	protectedDelegatorRouter.DELETE("/:id", delegatorController.Delete)
+
+	// Public verification route — no auth middleware
+	verificationRouter := router.Group("/verification")
+	verificationRouter.GET("/:id", verificationController.GetVerification)
+
+	// Letter template routes — GET all/by-id: semua auth user; CUD: admin only
+	templateRouter := router.Group("/template")
+	templateRouter.Use(middleware.DeserializeUser(Db))
+	templateRouter.GET("", letterTemplateController.GetAll)
+	templateRouter.GET("/:id", letterTemplateController.GetByID)
+	templateRouter.POST("", middleware.AdminOnly(Db), letterTemplateController.Create)
+	templateRouter.PUT("/:id", middleware.AdminOnly(Db), letterTemplateController.Update)
+	templateRouter.DELETE("/:id", middleware.AdminOnly(Db), letterTemplateController.Delete)
 
 	return service
 }

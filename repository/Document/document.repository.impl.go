@@ -621,6 +621,19 @@ func (t *DocumentRepositoryImpl) GetRecentDocuments(userId string, docType int) 
 	return documents, nil
 }
 
+func (r *DocumentRepositoryImpl) GetAllInProgressForSLA() ([]model.Document, *helper.ErrorModel) {
+	var documents []model.Document
+	result := r.Db.
+		Preload("DocumentSequence").
+		Where("status = 1").
+		Find(&documents)
+	if result.Error != nil {
+		msg := "Failed to get in-progress documents for SLA"
+		return nil, helper.ErrorCatcher(result.Error, 500, &msg)
+	}
+	return documents, nil
+}
+
 func (r *DocumentRepositoryImpl) Search(keyword string) ([]model.Document, *helper.ErrorModel) {
 	var documents []model.Document
 

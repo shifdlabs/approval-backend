@@ -5,7 +5,12 @@ import (
 	"Microservice/model"
 )
 
+type UserLogWithName struct {
+	model.UserLog
+	UserName string
+}
+
 type UserLogRepository interface {
 	Create(document model.UserLog)
-	GetAll() ([]model.UserLog, *helper.ErrorModel)
+	GetAll() ([]UserLogWithName, *helper.ErrorModel)
 }

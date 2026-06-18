@@ -7,5 +7,6 @@ import (
 
 type AppSettingsRepository interface {
 	GetAll() ([]model.AppSettings, *helper.ErrorModel)
+	GetByKey(key string) (*model.AppSettings, *helper.ErrorModel)
 	Update(properties []model.AppSettings) *helper.ErrorModel
 }

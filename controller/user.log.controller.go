@@ -3,6 +3,7 @@ package controller
 import (
 	service "Microservice/service/UserLog"
 	"Microservice/utils"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,4 +23,16 @@ func (controller *UserLogController) GetAll(ctx *gin.Context) {
 		return
 	}
 	utils.SuccessResponse(ctx, userLogResponse)
+}
+
+func (controller *UserLogController) Export(ctx *gin.Context) {
+	data, err := controller.userLogService.Export()
+	if err != nil {
+		utils.ErrorResponse(ctx, *err)
+		return
+	}
+	ctx.Header("Content-Disposition", `attachment; filename="activity-log.xlsx"`)
+	ctx.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	ctx.Header("Content-Length", fmt.Sprintf("%d", len(data)))
+	ctx.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }

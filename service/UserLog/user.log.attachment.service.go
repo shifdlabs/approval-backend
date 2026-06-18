@@ -9,4 +9,5 @@ import (
 type UserLogService interface {
 	GetAll() ([]response.UserLogResponse, *helper.ErrorModel)
 	CreateLog(log model.UserLog)
+	Export() ([]byte, *helper.ErrorModel)
 }

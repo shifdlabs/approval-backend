@@ -3,7 +3,10 @@ package controller
 import (
 	request "Microservice/data/request/User"
 	"Microservice/helper"
+	"Microservice/helper/enums"
+	"Microservice/model"
 	service "Microservice/service/User"
+	userLogService "Microservice/service/UserLog"
 	"Microservice/utils"
 	"strings"
 
@@ -13,11 +16,12 @@ import (
 const maxUploadSize = 10 * 1024 * 1024 // 10 MB
 
 type UserController struct {
-	userService service.UserService
+	userService    service.UserService
+	userLogService userLogService.UserLogService
 }
 
-func NewUserController(service service.UserService) *UserController {
-	return &UserController{userService: service}
+func NewUserController(service service.UserService, userLogSvc userLogService.UserLogService) *UserController {
+	return &UserController{userService: service, userLogService: userLogSvc}
 }
 
 func (controller *UserController) Get(ctx *gin.Context) {
@@ -90,6 +94,11 @@ func (controller *UserController) Create(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+	controller.userLogService.CreateLog(model.UserLog{
+		UserID: *helper.GetUserUUID(ctx),
+		Action: string(enums.Create),
+		Module: string(enums.User),
+	})
 	utils.SuccessResponse(ctx, nil)
 }
 
@@ -109,6 +118,11 @@ func (controller *UserController) Update(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+	controller.userLogService.CreateLog(model.UserLog{
+		UserID: *helper.GetUserUUID(ctx),
+		Action: string(enums.Update),
+		Module: string(enums.User),
+	})
 	utils.SuccessResponse(ctx, nil)
 }
 
@@ -119,6 +133,11 @@ func (controller *UserController) Delete(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+	controller.userLogService.CreateLog(model.UserLog{
+		UserID: *helper.GetUserUUID(ctx),
+		Action: string(enums.Delete),
+		Module: string(enums.User),
+	})
 	utils.SuccessResponse(ctx, nil)
 }
 
@@ -138,6 +157,11 @@ func (controller *UserController) MultipleDelete(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+	controller.userLogService.CreateLog(model.UserLog{
+		UserID: *helper.GetUserUUID(ctx),
+		Action: string(enums.Delete),
+		Module: string(enums.User),
+	})
 	utils.SuccessResponse(ctx, nil)
 }
 
@@ -163,6 +187,11 @@ func (controller *UserController) UpdateEmail(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+	controller.userLogService.CreateLog(model.UserLog{
+		UserID: *helper.GetUserUUID(ctx),
+		Action: string(enums.Update),
+		Module: string(enums.Profile),
+	})
 	utils.SuccessResponse(ctx, nil)
 }
 
@@ -188,6 +217,11 @@ func (controller *UserController) UpdateBiodata(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+	controller.userLogService.CreateLog(model.UserLog{
+		UserID: *helper.GetUserUUID(ctx),
+		Action: string(enums.Update),
+		Module: string(enums.Profile),
+	})
 	utils.SuccessResponse(ctx, nil)
 }
 
@@ -207,6 +241,11 @@ func (controller *UserController) UpdateRole(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+	controller.userLogService.CreateLog(model.UserLog{
+		UserID: *helper.GetUserUUID(ctx),
+		Action: string(enums.Update),
+		Module: string(enums.User),
+	})
 	utils.SuccessResponse(ctx, nil)
 }
 
@@ -226,6 +265,11 @@ func (controller *UserController) UpdatePassword(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+	controller.userLogService.CreateLog(model.UserLog{
+		UserID: *helper.GetUserUUID(ctx),
+		Action: string(enums.Update),
+		Module: string(enums.Profile),
+	})
 	utils.SuccessResponse(ctx, nil)
 }
 
@@ -245,6 +289,11 @@ func (controller *UserController) UpdateAccess(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+	controller.userLogService.CreateLog(model.UserLog{
+		UserID: *helper.GetUserUUID(ctx),
+		Action: string(enums.Update),
+		Module: string(enums.User),
+	})
 	utils.SuccessResponse(ctx, nil)
 }
 

@@ -25,8 +25,10 @@ type DocumentDetailResponse struct {
 	DocumentReferences *[]DocumentReference       `json:"documentReferences"`
 	CreatedAt          time.Time                  `json:"createdAt"`
 	UpdatedAt          time.Time                  `json:"updatedAt"`
+	DueDate            *time.Time                 `json:"dueDate"`
 	IsApprover         bool                       `json:"isApprover"`
 	IsAllowToUpdate    bool                       `json:"isAllowToUpdate"`
+	CanRecall          bool                       `json:"canRecall"`
 }
 
 type DocumentReference struct {

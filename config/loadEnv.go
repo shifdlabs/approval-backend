@@ -32,6 +32,9 @@ type Config struct {
 	SMTPPassword string `mapstructure:"SMTP_PASSWORD"`
 	SMTPFrom     string `mapstructure:"SMTP_FROM"`
 	FrontendURL  string `mapstructure:"FRONTEND_URL"`
+
+	ResendAPIKey string `mapstructure:"RESEND_API_KEY"`
+	EmailFrom    string `mapstructure:"EMAIL_FROM"`
 }
 
 func LoadConfig(path string) (config Config, err error) {

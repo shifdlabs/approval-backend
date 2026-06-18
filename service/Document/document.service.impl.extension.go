@@ -6,6 +6,9 @@ import (
 	"Microservice/helper"
 	"Microservice/model"
 	"fmt"
+	"time"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 func (t DocumentServiceImpl) mapDocumentsToDocumentResponse(documents []model.Document) []response.DocumentResponse {
@@ -28,10 +31,14 @@ func (t DocumentServiceImpl) convertDocumentToDocumentResponse(document model.Do
 			user, _ := t.UserRepository.Get(currentApprover.UserID.String(), true)
 
 			if user != nil {
+				positionName := ""
+				if user.Position != nil {
+					positionName = user.Position.Name
+				}
 				title := fmt.Sprintf("%s %s - %s",
 					user.FirstName,
 					user.LastName,
-					user.Position.Name,
+					positionName,
 				)
 
 				currentApproverTitle = &title
@@ -119,6 +126,13 @@ func (t DocumentServiceImpl) convertToDocumentDetailResponse(document model.Docu
 		publicationValue = ""
 	}
 
+	var author model.User
+	if document.Author != nil {
+		author = *document.Author
+	}
+	isAllowToUpdate := document.Author != nil && document.Author.ID.String() == userId && document.Status == 99
+	canRecall := document.Author != nil && document.Author.ID.String() == userId && document.Status == 1 && len(document.DocumentHistory) == 0
+
 	response := response.DocumentDetailResponse{
 		Id:                 &document.ID,
 		PublicationValue:   publicationValue,
@@ -129,7 +143,7 @@ func (t DocumentServiceImpl) convertToDocumentDetailResponse(document model.Docu
 		Step:               document.Step,
 		Status:             document.Status,
 		Priority:           document.Priority,
-		Author:             *document.Author,
+		Author:             author,
 		DocumentSequence:   *inProgressOverview,
 		DocumentHistory:    &documentHistories,
 		DocumentAttachment: &documentAttachment,
@@ -137,8 +151,10 @@ func (t DocumentServiceImpl) convertToDocumentDetailResponse(document model.Docu
 		InternalRecipients: &recipients,
 		CreatedAt:          *document.CreatedAt,
 		UpdatedAt:          *document.UpdatedAt,
-		IsApprover:         currentApprover.UserID.String() == userId,
-		IsAllowToUpdate:    document.Author.ID.String() == userId && document.Status == 99,
+		IsApprover:         t.isApproverOrDelegate(currentApprover, document.Status, userId),
+		IsAllowToUpdate:    isAllowToUpdate,
+		CanRecall:          canRecall,
+		DueDate:            document.DueDate,
 	}
 
 	return response
@@ -146,14 +162,20 @@ func (t DocumentServiceImpl) convertToDocumentDetailResponse(document model.Docu
 
 func (t DocumentServiceImpl) getInternalRecipients(documentId string) []response.InternalRecipient {
 	recipientsResponse, _ := t.RecipientRepository.GetRecipientsByDocId(documentId)
-	recipients := make([]response.InternalRecipient, len(recipientsResponse))
-	for i, recipient := range recipientsResponse {
+	recipients := make([]response.InternalRecipient, 0, len(recipientsResponse))
+	for _, recipient := range recipientsResponse {
 		user, _ := t.UserRepository.Get(recipient.UserID.String(), true)
-
-		recipients[i] = response.InternalRecipient{
-			Name:  user.FirstName + " " + user.LastName,
-			Title: user.Position.Name,
+		if user == nil {
+			continue
 		}
+		positionName := ""
+		if user.Position != nil {
+			positionName = user.Position.Name
+		}
+		recipients = append(recipients, response.InternalRecipient{
+			Name:  user.FirstName + " " + user.LastName,
+			Title: positionName,
+		})
 	}
 
 	return recipients
@@ -179,10 +201,17 @@ func (t DocumentServiceImpl) getDocumentHistory(document model.Document) []respo
 	documentHistories := make([]response.DocumentHistory, len(document.DocumentHistory))
 	for i, history := range document.DocumentHistory {
 		user, _ := t.UserRepository.Get(history.UserID.String(), true)
-
+		name := ""
+		positionName := ""
+		if user != nil {
+			name = user.FirstName + " " + user.LastName
+			if user.Position != nil {
+				positionName = user.Position.Name
+			}
+		}
 		documentHistories[i] = response.DocumentHistory{
-			Name:       user.FirstName + " " + user.LastName,
-			Title:      user.Position.Name,
+			Name:       name,
+			Title:      positionName,
 			IsApproved: history.IsApproved,
 			Reason:     history.Description,
 			UpdatedAt:  history.CreatedAt.String(),
@@ -203,6 +232,32 @@ func (t DocumentServiceImpl) getApprovers(document model.Document) []string {
 	return approverIds
 }
 
+// isApproverOrDelegate returns true when userId is either the direct sequence approver
+// or is in the owner-chain that delegates authority to userId on today's date.
+func (t DocumentServiceImpl) isApproverOrDelegate(currentApprover model.DocumentSequence, documentStatus int, userId string) bool {
+	if documentStatus != 1 {
+		fmt.Printf("[isApproverOrDelegate] status=%d != 1, returning false\n", documentStatus)
+		return false
+	}
+	seqUserID := currentApprover.UserID.String()
+	fmt.Printf("[isApproverOrDelegate] seqUserID=%s userId=%s\n", seqUserID, userId)
+	if seqUserID == userId {
+		return true
+	}
+	ownerChain, err := t.getOwnerChainForDelegate(userId, time.Now())
+	fmt.Printf("[isApproverOrDelegate] ownerChain=%v err=%v\n", ownerChain, err)
+	if err != nil {
+		return false
+	}
+	for _, ownerID := range ownerChain {
+		if ownerID == seqUserID {
+			fmt.Printf("[isApproverOrDelegate] delegate match found, returning true\n")
+			return true
+		}
+	}
+	return false
+}
+
 func (t DocumentServiceImpl) getCurrentApprover(sequences []model.DocumentSequence, document model.Document) model.DocumentSequence {
 	currentApprover := model.DocumentSequence{}
 	if len(sequences) > 0 {
@@ -218,6 +273,13 @@ func (t DocumentServiceImpl) convertRequestToCreateModel(documentRequest request
 		customPublicationCode = documentRequest.PublicationValue
 	}
 
+	var templateUUID *uuid.UUID
+	if documentRequest.TemplateID != nil && *documentRequest.TemplateID != "" {
+		if parsed, err := uuid.FromString(*documentRequest.TemplateID); err == nil {
+			templateUUID = &parsed
+		}
+	}
+
 	// Store to DB
 	document := model.Document{
 		Author:                  user,
@@ -231,6 +293,7 @@ func (t DocumentServiceImpl) convertRequestToCreateModel(documentRequest request
 		Step:                    documentRequest.Step,
 		LetterHead:              documentRequest.LetterHead,
 		Status:                  documentRequest.Status,
+		TemplateID:              templateUUID,
 	}
 
 	return &document, nil

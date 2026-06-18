@@ -38,6 +38,19 @@ func (t *AppSettingsRepositoryImpl) GetAll() ([]model.AppSettings, *helper.Error
 	return appSettingss, nil
 }
 
+func (t *AppSettingsRepositoryImpl) GetByKey(key string) (*model.AppSettings, *helper.ErrorModel) {
+	var setting model.AppSettings
+	result := t.Db.Where("key = ?", key).First(&setting)
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		msg := "Failed to get app setting by key"
+		return nil, helper.ErrorCatcher(result.Error, 500, &msg)
+	}
+	return &setting, nil
+}
+
 func (t *AppSettingsRepositoryImpl) Update(appSettings []model.AppSettings) *helper.ErrorModel {
 	trx := t.Db.Begin()
 	trx.Begin()

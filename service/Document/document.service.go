@@ -33,4 +33,6 @@ type DocumentService interface {
 	GetRecentActivities(userId string) ([]response.ActivityResponse, *helper.ErrorModel)
 	GetRecentDocuments(userId string, docType int) ([]response.RecentDocumentResponse, *helper.ErrorModel)
 	Search(keyword string) ([]response.SearchDocumentResponse, *helper.ErrorModel)
+	Recall(documentId string, userId string) *helper.ErrorModel
+	GetVerification(documentId string) (*response.VerificationResponse, *helper.ErrorModel)
 }

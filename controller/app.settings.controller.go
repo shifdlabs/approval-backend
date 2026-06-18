@@ -2,20 +2,24 @@ package controller
 
 import (
 	"Microservice/helper"
+	"Microservice/helper/enums"
+	"Microservice/model"
 	"Microservice/utils"
 
 	request "Microservice/data/request/AppSettings"
 	service "Microservice/service/AppSettings"
+	userLogService "Microservice/service/UserLog"
 
 	"github.com/gin-gonic/gin"
 )
 
 type AppSettingsController struct {
 	appSettingsService service.AppSettingService
+	userLogService     userLogService.UserLogService
 }
 
-func NewAppSettingsController(service service.AppSettingService) *AppSettingsController {
-	return &AppSettingsController{appSettingsService: service}
+func NewAppSettingsController(service service.AppSettingService, userLogSvc userLogService.UserLogService) *AppSettingsController {
+	return &AppSettingsController{appSettingsService: service, userLogService: userLogSvc}
 }
 
 func (controller *AppSettingsController) GetAll(ctx *gin.Context) {
@@ -44,5 +48,10 @@ func (controller *AppSettingsController) Update(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, *err)
 		return
 	}
+	controller.userLogService.CreateLog(model.UserLog{
+		UserID: *helper.GetUserUUID(ctx),
+		Action: string(enums.Update),
+		Module: string(enums.AppSettingsModule),
+	})
 	utils.SuccessResponse(ctx, nil)
 }

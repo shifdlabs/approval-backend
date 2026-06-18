@@ -31,4 +31,5 @@ type DocumentRepository interface {
 	GetRecentActivities(userId string) ([]model.DocumentHistory, *helper.ErrorModel)
 	GetRecentDocuments(userId string, docType int) ([]model.Document, *helper.ErrorModel)
 	Search(keyword string) ([]model.Document, *helper.ErrorModel)
+	GetAllInProgressForSLA() ([]model.Document, *helper.ErrorModel)
 }

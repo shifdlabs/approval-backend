@@ -24,13 +24,17 @@ func (t *UserLogRepositoryImpl) Create(document model.UserLog) {
 	}
 }
 
-func (t *UserLogRepositoryImpl) GetAll() ([]model.UserLog, *helper.ErrorModel) {
-	var userLogs []model.UserLog
-	result := t.Db.Find(&userLogs)
+func (t *UserLogRepositoryImpl) GetAll() ([]UserLogWithName, *helper.ErrorModel) {
+	var rows []UserLogWithName
+	result := t.Db.Table("user_logs").
+		Select("user_logs.*, COALESCE(u.first_name || ' ' || u.last_name, 'Unknown') AS user_name").
+		Joins("LEFT JOIN users u ON u.id = user_logs.user_id AND u.deleted_at IS NULL").
+		Where("user_logs.deleted_at IS NULL").
+		Order("user_logs.log_date DESC").
+		Scan(&rows)
 	if result.Error != nil {
 		msg := "Failed to get all user logs"
 		return nil, helper.ErrorCatcher(result.Error, 500, &msg)
 	}
-
-	return userLogs, nil
+	return rows, nil
 }

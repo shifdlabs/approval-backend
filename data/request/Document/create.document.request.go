@@ -17,6 +17,7 @@ type CreateDocumentRequest struct {
 	Sequences             []DocumentSequence          `validate:"required" json:"sequences"`
 	Attachments           []DocumentAttachmentRequest `json:"attachments"`
 	References            []string                    `json:"references"`
+	TemplateID            *string                     `json:"templateId"`
 }
 
 type DocumentSequence struct {
