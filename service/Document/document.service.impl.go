@@ -775,6 +775,7 @@ func (t DocumentServiceImpl) Update(request request.UpdateDocumentRequest) (*mod
 		document.Status = 0
 	} else {
 		document.Status = 1
+		document.Step = 1
 	}
 
 	t.DocumentRepository.Update(*document)
