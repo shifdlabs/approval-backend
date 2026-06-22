@@ -311,7 +311,7 @@ func (t DocumentServiceImpl) convertDocumentToEditDocumentResponse(document mode
 	}
 
 	carbonCopiesIds := make([]string, 0, len(carbonCopy))
-	for _, r := range internalRecipient {
+	for _, r := range carbonCopy {
 		carbonCopiesIds = append(carbonCopiesIds, string(r.UserID.String()))
 	}
 

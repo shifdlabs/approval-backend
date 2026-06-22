@@ -5,6 +5,7 @@ import (
 	"Microservice/controller"
 	"Microservice/helper"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -79,7 +80,10 @@ func NewRouter(
 
 	authRouter := router.Group("/auth")
 	authRouter.POST("/login", authController.LogIn)
-	authRouter.POST("/register", authController.Register)
+	if os.Getenv("APP_ENV") == "development" || os.Getenv("APP_ENV") == "testing" {
+		// For Testing Only, Please Remove this API for Production
+		authRouter.POST("/register", authController.Register)
+	}
 	authRouter.POST("/forgot-password", authController.ForgotPassword)
 	authRouter.POST("/reset-password", authController.ResetPassword)
 
