@@ -13,7 +13,6 @@ import (
 	userLogService "Microservice/service/UserLog"
 	"Microservice/utils"
 
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -40,8 +39,6 @@ func (controller *AuthController) LogIn(ctx *gin.Context) {
 		utils.ErrorResponse(ctx, helper.ErrorModel{Code: 400, Message: "Bad Request"})
 		return
 	}
-
-	log.Printf("[LOGIN] Email: %s | CompanyName: %s", payload.Email, payload.CompanyName)
 
 	loginResult, err := controller.authService.Login(*payload)
 	if err != nil {
