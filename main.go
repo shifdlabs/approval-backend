@@ -214,7 +214,7 @@ func main() {
 
 	// Intialize Server
 	server := &http.Server{
-		Addr:           ":8081",
+		Addr:           ":8000",
 		Handler:        routes,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
